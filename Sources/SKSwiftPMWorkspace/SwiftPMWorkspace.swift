@@ -162,7 +162,7 @@ public final class SwiftPMWorkspace {
       log("could not find manifest, or not a SwiftPM package: \(path)", level: .warning)
       return nil
     } catch {
-      log("failed to create \(SwiftPMWorkspace.self): \(error)", level: .error)
+      log("failed to create \(SwiftPMWorkspace.self) while initializing with path \(url.path): \(error) - \(error.localizedDescription)", level: .error)
       return nil
     }
   }
