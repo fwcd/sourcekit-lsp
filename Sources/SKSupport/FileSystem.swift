@@ -34,7 +34,7 @@ extension AbsolutePath {
   }
   
   /// Initializes an absolute path from a string, expanding a leading Windows drive letter ('/d:/...') to the WSL equivalent ('/mnt/d/...')
-  public init(expandingWSL path: String) {
+  public init(validatingAndExpandingWSL path: String) {
     #if os(Linux)
       // Support the special case where a user runs an
       // editor on Windows with the language server through
@@ -45,12 +45,12 @@ extension AbsolutePath {
       if let windowsPathMatch = windowsPathRegex.firstMatch(in: path, range: NSMakeRange(0, path.length)) {
         let driveLetter = path.character(at: 1)
         let newPrefix = "/mnt\(driveLetter)"
-        self.init(newPrefix + path.dropFirst(3))
+        self.init(validating: newPrefix + path.dropFirst(3))
       } else {
-        self.init(path)
+        self.init(validating: path)
       }
     #else
-      self.init(path)
+      self.init(validating: path)
     #endif
   }
 }
