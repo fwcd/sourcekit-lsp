@@ -42,8 +42,9 @@ extension AbsolutePath {
       // In this case, the editor will attempt to pass paths such as
       // '/d:/...' to the language server which, however, expects
       // them to be formatted as '/mnt/d/...'.
-      if let windowsPathMatch = windowsPathRegex.firstMatch(in: path, range: NSMakeRange(0, path.length)) {
-        let driveLetter = path.character(at: 1)
+      if let _ = windowsPathRegex.firstMatch(in: path, range: NSMakeRange(0, path.length)) {
+        let letterIndex = path.index(path.startIndex, offsetBy: 1)
+        let driveLetter = path[letterIndex]
         let newPrefix = "/mnt\(driveLetter)"
         try self.init(validating: newPrefix + path.dropFirst(3))
       } else {
