@@ -13,6 +13,10 @@
 import Basic
 import Foundation
 
+/// A regex to detect Windows directory paths such as '/d:/...'.
+/// It captures the drive letter used.
+fileprivate let windowsPathRegex = try! NSRegularExpression(pattern: "\\/([a-zA-Z]):.*", options: [])
+
 /// The home directory of the current user (same as returned by Foundation's `NSHomeDirectory` method).
 public var homeDirectoryForCurrentUser: AbsolutePath {
   return AbsolutePath(NSHomeDirectory())
@@ -27,5 +31,26 @@ extension AbsolutePath {
     } else {
       self.init(path)
     }
+  }
+  
+  /// Initializes an absolute path from a string, expanding a leading Windows drive letter ('/d:/...') to the WSL equivalent ('/mnt/d/...')
+  public init(expandingWSL path: String) {
+    #if os(Linux)
+      // Support the special case where a user runs an
+      // editor on Windows with the language server through
+      // Windows Subsystem for Linux (WSL).
+      // In this case, the editor will attempt to pass paths such as
+      // '/d:/...' to the language server which, however, expects
+      // them to be formatted as '/mnt/d/...'.
+      if let windowsPathMatch = windowsPathRegex.firstMatch(in: path, range: NSMakeRange(0, path.length)) {
+        let driveLetter = path.character(at: 1)
+        let newPrefix = "/mnt\(driveLetter)"
+        self.init(newPrefix + path.dropFirst(3))
+      } else {
+        self.init(path)
+      }
+    #else
+      self.init(path)
+    #endif
   }
 }
