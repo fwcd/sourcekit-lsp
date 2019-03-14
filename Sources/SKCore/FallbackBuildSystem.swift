@@ -22,7 +22,7 @@ public final class FallbackBuildSystem: BuildSystem {
     if case .darwin? = Platform.currentPlatform,
        let str = try? Process.checkNonZeroExit(
          args: "/usr/bin/xcrun", "--show-sdk-path", "--sdk", "macosx"),
-       let path = try? AbsolutePath(validating: str.spm_chomp())
+       let path = try? AbsolutePath(validatingAndExpandingWSL: str.spm_chomp())
     {
       return path
     }
@@ -34,7 +34,7 @@ public final class FallbackBuildSystem: BuildSystem {
   public var indexDatabasePath: AbsolutePath? { return nil }
 
   public func settings(for url: URL, _ language: Language) -> FileBuildSettings? {
-    guard let path = try? AbsolutePath(validating: url.path) else {
+    guard let path = try? AbsolutePath(validatingAndExpandingWSL: url.path) else {
       return nil
     }
 

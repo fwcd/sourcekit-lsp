@@ -279,7 +279,7 @@ extension ToolchainRegistry {
     var shouldSetDefault = setDefault
     for envVar in environmentVariables {
       if let pathStr = getenv(envVar),
-         let path = try? AbsolutePath(validating: pathStr),
+         let path = try? AbsolutePath(validatingAndExpandingWSL: pathStr),
          let toolchain = try? _registerToolchain(path, fileSystem),
          shouldSetDefault
       {

@@ -50,7 +50,7 @@ extension CompilationDatabaseBuildSystem: BuildSystem {
   }
 
   func database(for url: URL) -> CompilationDatabase? {
-    if let path = try? AbsolutePath(validating: url.path) {
+    if let path = try? AbsolutePath(validatingAndExpandingWSL: url.path) {
       return database(for: path)
     }
     return compdb

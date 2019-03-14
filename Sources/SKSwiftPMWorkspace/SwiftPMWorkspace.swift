@@ -83,12 +83,12 @@ public final class SwiftPMWorkspace {
       if let path = try? Process.checkNonZeroExit(args:
         "/usr/bin/xcrun", "--show-sdk-path", "--sdk", "macosx")
       {
-        sdk = try? AbsolutePath(validating: path.spm_chomp())
+        sdk = try? AbsolutePath(validatingAndExpandingWSL: path.spm_chomp())
       }
       if let path = try? Process.checkNonZeroExit(args:
         "/usr/bin/xcrun", "--show-sdk-platform-path", "--sdk", "macosx")
       {
-        platformPath = try? AbsolutePath(validating: path.spm_chomp())
+        platformPath = try? AbsolutePath(validatingAndExpandingWSL: path.spm_chomp())
       }
     }
 
@@ -154,7 +154,7 @@ public final class SwiftPMWorkspace {
   {
     do {
       try self.init(
-        workspacePath: try AbsolutePath(validating: url.path),
+        workspacePath: try AbsolutePath(validatingAndExpandingWSL: url.path),
         toolchainRegistry: toolchainRegistry,
         fileSystem: localFileSystem,
         buildSetup: buildSetup)
@@ -232,7 +232,7 @@ extension SwiftPMWorkspace: BuildSystem {
     for url: LanguageServerProtocol.URL,
     _ language: Language) -> FileBuildSettings?
   {
-    guard let path = try? AbsolutePath(validating: url.path) else {
+    guard let path = try? AbsolutePath(validatingAndExpandingWSL: url.path) else {
       return nil
     }
 
