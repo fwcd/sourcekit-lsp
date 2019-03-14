@@ -45,7 +45,7 @@ extension AbsolutePath {
       if let _ = windowsPathRegex.firstMatch(in: path, range: NSMakeRange(0, path.length)) {
         let letterIndex = path.index(path.startIndex, offsetBy: 1)
         let driveLetter = path[letterIndex]
-        let newPrefix = "/mnt\(driveLetter)"
+        let newPrefix = "/mnt/\(driveLetter)"
         try self.init(validating: newPrefix + path.dropFirst(3))
       } else {
         try self.init(validating: path)
