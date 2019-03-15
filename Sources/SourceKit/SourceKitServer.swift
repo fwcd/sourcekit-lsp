@@ -377,7 +377,7 @@ extension SourceKitServer {
           return nil
         }
         return Location(
-          url: URL(fileURLWithPath: occur.location.path),
+          url: URL(fileURLWithPath: shrink(fromWSLPath: occur.location.path)),
           range: Range(Position(
             line: occur.location.line - 1, // 1-based -> 0-based
             // FIXME: we need to convert the utf8/utf16 column, which may require reading the file!
@@ -432,7 +432,7 @@ extension SourceKitServer {
           return nil
         }
         return Location(
-          url: URL(fileURLWithPath: occur.location.path),
+          url: URL(fileURLWithPath: shrink(fromWSLPath: occur.location.path)),
           range: Range(Position(
             line: occur.location.line - 1, // 1-based -> 0-based
             // FIXME: we need to convert the utf8/utf16 column, which may require reading the file!

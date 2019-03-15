@@ -16,6 +16,9 @@ import Foundation
 /// A regex to detect Windows directory paths such as '/d:/...'.
 /// It captures the drive letter used.
 fileprivate let windowsPathRegex = try! NSRegularExpression(pattern: "\\/([a-zA-Z]):.*", options: [])
+/// A regex to detect WSL directory paths such as '/mnt/d/...'
+/// It captures the drive letter used.
+fileprivate let wslPathRegex = try! NSRegularExpression(pattern: "\\/mnt\\/([a-zA-Z]).*", options: [])
 
 /// The home directory of the current user (same as returned by Foundation's `NSHomeDirectory` method).
 public var homeDirectoryForCurrentUser: AbsolutePath {
@@ -38,6 +41,25 @@ public func expand(toWSLPath path: String) -> String {
       let driveLetter = path[letterIndex]
       let newPrefix = "/mnt/\(driveLetter)"
       return newPrefix + path.dropFirst(3)
+    }
+  #endif
+  return path
+}
+
+/// The inverse function to expand(toWSLPath:). Converts a WSL path (such as '/mnt/d/...')
+/// back into its Windows representation ('/d:/...').
+public func shrink(fromWSLPath path: String) -> String {
+  #if os(Linux)
+    // Support the special case where a user runs an
+    // editor on Windows with the language server through
+    // Windows Subsystem for Linux (WSL).
+    // This function converts WSL paths (such as '/mnt/d...')
+    // back into their original representation of Windows (in this case '/d:/...')
+    if let _ = wslPathRegex.firstMatch(in: path, range: NSMakeRange(0, path.length)) {
+      let letterIndex = path.index(path.startIndex, offsetBy: 5)
+      let driveLetter = path[letterIndex]
+      let newPrefix = "/\(driveLetter):"
+      return newPrefix + path.dropFirst(6)
     }
   #endif
   return path
