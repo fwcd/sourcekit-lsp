@@ -56,6 +56,6 @@ extension AbsolutePath {
   
   /// Initializes an absolute path from a string, expanding a leading Windows drive letter ('/d:/...') to the WSL equivalent ('/mnt/d/...')
   public init(validatingAndExpandingWSL path: String) throws {
-    self.init(validating: expand(wslPath: path))
+    try self.init(validating: expand(wslPath: path))
   }
 }
