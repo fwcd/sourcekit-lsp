@@ -25,7 +25,7 @@ public var homeDirectoryForCurrentUser: AbsolutePath {
 /// Expands a leading Windows drive letter in a file path ('/d:/...') to the WSL equivalent ('/mnt/d/...')
 /// This, however, only applies to the special case where a native Windows
 /// LSP client/editor is used while this language server runs via WSL.
-public func expand(wslPath path: String) -> String {
+public func expand(toWSLPath path: String) -> String {
   #if os(Linux)
     // Support the special case where a user runs an
     // editor on Windows with the language server through
@@ -56,6 +56,6 @@ extension AbsolutePath {
   
   /// Initializes an absolute path from a string, expanding a leading Windows drive letter ('/d:/...') to the WSL equivalent ('/mnt/d/...')
   public init(validatingAndExpandingWSL path: String) throws {
-    try self.init(validating: expand(wslPath: path))
+    try self.init(validating: expand(toWSLPath: path))
   }
 }

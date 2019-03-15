@@ -139,7 +139,7 @@ public final class SwiftLanguageServer: LanguageServer {
 
     let req = SKRequestDictionary(sourcekitd: sourcekitd)
     req[keys.request] = requests.editor_replacetext
-    req[keys.name] = expand(wslPath: url.path)
+    req[keys.name] = expand(toWSLPath: url.path)
     req[keys.offset] = 0
     req[keys.length] = 0
     req[keys.sourcetext] = ""
@@ -223,7 +223,7 @@ extension SwiftLanguageServer {
 
     let req = SKRequestDictionary(sourcekitd: sourcekitd)
     req[keys.request] = requests.editor_open
-    req[keys.name] = expand(wslPath: note.params.textDocument.url.path)
+    req[keys.name] = expand(toWSLPath: note.params.textDocument.url.path)
     req[keys.sourcetext] = snapshot.text
 
     if let settings = buildSystem.settings(for: snapshot.document.url, snapshot.document.language) {
@@ -243,7 +243,7 @@ extension SwiftLanguageServer {
 
     let req = SKRequestDictionary(sourcekitd: sourcekitd)
     req[keys.request] = requests.editor_close
-    req[keys.name] = expand(wslPath: note.params.textDocument.url.path)
+    req[keys.name] = expand(toWSLPath: note.params.textDocument.url.path)
 
     _ = self.sourcekitd.sendSync(req)
   }
@@ -255,7 +255,7 @@ extension SwiftLanguageServer {
     let snapshot = documentManager.edit(note) { (before: DocumentSnapshot, edit: TextDocumentContentChangeEvent) in
       let req = SKRequestDictionary(sourcekitd: self.sourcekitd)
       req[self.keys.request] = self.requests.editor_replacetext
-      req[self.keys.name] = expand(wslPath: note.params.textDocument.url.path)
+      req[self.keys.name] = expand(toWSLPath: note.params.textDocument.url.path)
 
       if let range = edit.range {
 
@@ -315,7 +315,7 @@ extension SwiftLanguageServer {
     let skreq = SKRequestDictionary(sourcekitd: sourcekitd)
     skreq[keys.request] = requests.codecomplete
     skreq[keys.offset] = offset
-    skreq[keys.sourcefile] = expand(wslPath: snapshot.document.url.path)
+    skreq[keys.sourcefile] = expand(toWSLPath: snapshot.document.url.path)
     skreq[keys.sourcetext] = snapshot.text
 
     if let settings = buildSystem.settings(for: snapshot.document.url, snapshot.document.language) {
@@ -488,7 +488,7 @@ extension SwiftLanguageServer {
     let skreq = SKRequestDictionary(sourcekitd: sourcekitd)
     skreq[keys.request] = requests.relatedidents
     skreq[keys.offset] = offset
-    skreq[keys.sourcefile] = expand(wslPath: snapshot.document.url.path)
+    skreq[keys.sourcefile] = expand(toWSLPath: snapshot.document.url.path)
 
     // FIXME: should come from the internal document
     if let settings = buildSystem.settings(for: snapshot.document.url, snapshot.document.language) {
@@ -538,7 +538,7 @@ extension SwiftLanguageServer {
 
     let skreq = SKRequestDictionary(sourcekitd: sourcekitd)
     skreq[keys.request] = requests.editor_open
-    skreq[keys.name] = "FoldingRanges:" + expand(wslPath: snapshot.document.url.path)
+    skreq[keys.name] = "FoldingRanges:" + expand(toWSLPath: snapshot.document.url.path)
     skreq[keys.sourcetext] = snapshot.text
     skreq[keys.syntactic_only] = 1
 

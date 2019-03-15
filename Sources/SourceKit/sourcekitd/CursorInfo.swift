@@ -127,7 +127,7 @@ extension SwiftLanguageServer {
     let skreq = SKRequestDictionary(sourcekitd: sourcekitd)
     skreq[keys.request] = requests.cursorinfo
     skreq[keys.offset] = offset
-    skreq[keys.sourcefile] = expand(wslPath: snapshot.document.url.path)
+    skreq[keys.sourcefile] = expand(toWSLPath: snapshot.document.url.path)
 
     // FIXME: should come from the internal document
     if let settings = buildSystem.settings(for: snapshot.document.url, snapshot.document.language) {
