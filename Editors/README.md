@@ -15,6 +15,23 @@ After installing the extension, settings for SourceKit-LSP can be found in `Pref
 * `sourcekit-lsp.toolchainPath`: The path to the swift toolchain (sets `SOURCEKIT_TOOLCHAIN_PATH`)
 * `sourcekit-lsp.tracing.server`: Traces the communication between VS Code and the SourceKit-LSP language server
 
+### ...using Windows Subsystem for Linux
+
+To run the language server through WSL while using VSCode on Windows, you will first need to setup a launch script. This could be a Batch-File located on your (Windows) `PATH`:
+
+```batch
+@echo off
+wsl SOURCEKIT_TOOLCHAIN_PATH=<linux-path to toolchain> <linux-path to sourcekit executable> %*
+```
+
+Install the extension in VSCode as described above and add the following settings entry:
+
+```json
+"sourcekit-lsp.serverPath": "<windows-path to launch-script>"
+```
+
+Finally, reload the editor to apply these changes.
+
 ## Sublime Text
 
 Before using SourceKit-LSP with Sublime Text, you will need to install the LSP package from Package Control. To configure SourceKit-LSP, open the LSP package's settings. The following snippet should be enough to get started with Swift.
