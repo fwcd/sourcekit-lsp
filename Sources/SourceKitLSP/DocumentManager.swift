@@ -19,12 +19,22 @@ public struct DocumentSnapshot {
   public var document: Document
   public var version: Int
   public var lineTable: LineTable
+  public var syntacticTokens: [SemanticToken]
+  public var semanticTokens: [SemanticToken]
   public var text: String { return lineTable.content }
 
-  public init(document: Document, version: Int, lineTable: LineTable) {
+  public init(
+    document: Document,
+    version: Int,
+    lineTable: LineTable,
+    syntacticTokens: [SemanticToken],
+    semanticTokens: [SemanticToken]
+  ) {
     self.document = document
     self.version = version
     self.lineTable = lineTable
+    self.syntacticTokens = syntacticTokens
+    self.semanticTokens = semanticTokens
   }
 
   func index(of pos: Position) -> String.Index? {
@@ -37,17 +47,27 @@ public final class Document {
   public let language: Language
   var latestVersion: Int
   var latestLineTable: LineTable
+  var latestSyntacticTokens: [SemanticToken]
+  var latestSemanticTokens: [SemanticToken]
 
   init(uri: DocumentURI, language: Language, version: Int, text: String) {
     self.uri = uri
     self.language = language
     self.latestVersion = version
     self.latestLineTable = LineTable(text)
+    self.latestSyntacticTokens = []
+    self.latestSemanticTokens = []
   }
 
   /// **Not thread safe!** Use `DocumentManager.latestSnapshot` instead.
   fileprivate var latestSnapshot: DocumentSnapshot {
-    return DocumentSnapshot(document: self, version: latestVersion, lineTable: latestLineTable)
+    DocumentSnapshot(
+      document: self,
+      version: latestVersion,
+      lineTable: latestLineTable,
+      syntacticTokens: latestSyntacticTokens,
+      semanticTokens: latestSemanticTokens
+    )
   }
 }
 
@@ -115,22 +135,100 @@ public final class DocumentManager {
         }
 
         if let range = edit.range  {
-
           document.latestLineTable.replace(
             fromLine: range.lowerBound.line,
             utf16Offset: range.lowerBound.utf16index,
             toLine: range.upperBound.line,
             utf16Offset: range.upperBound.utf16index,
             with: edit.text)
+          
+          // Remove all tokens in the updated range and shift later ones.
 
+          let previousLineCount = 1 + range.upperBound.line - range.lowerBound.line
+          let newLines = edit.text.split(separator: "\n", omittingEmptySubsequences: false)
+          let lastLineReplaceLength = (
+            range.lowerBound.line == range.upperBound.line ? range.upperBound.utf16index : 0
+          ) - range.lowerBound.utf16index
+          let lastLineLengthDelta = newLines.last!.count - lastLineReplaceLength
+          let lineDelta = newLines.count - previousLineCount
+
+          func isTokenBounding(character: Character) -> Bool {
+            character.isWhitespace || character.isPunctuation || character.isSymbol
+          }
+
+          func update(tokens: inout [SemanticToken]) {
+            tokens = Array(tokens.lazy
+              .filter {
+                // Only keep tokens that don't overlap with or are directly
+                // adjacent to the edit range and also are adjacent to a
+                // token-bounding character.
+                $0.start > range.upperBound || range.lowerBound > $0.end
+                || ($0.start == range.upperBound && (edit.text.first.map(isTokenBounding(character:)) ?? true))
+                || ($0.end == range.lowerBound && (edit.text.last.map(isTokenBounding(character:)) ?? true))
+              }
+              .map {
+                // Shift tokens after the edit range
+                var token = $0
+                if token.start.line == range.upperBound.line
+                  && token.start.utf16index >= range.upperBound.utf16index {
+                  token.start.utf16index += lastLineLengthDelta
+                  token.start.line += lineDelta
+                } else if token.start.line > range.upperBound.line {
+                  token.start.line += lineDelta
+                }
+                return token
+              })
+          }
+
+          update(tokens: &document.latestSyntacticTokens)
+          update(tokens: &document.latestSemanticTokens)
         } else {
           // Full text replacement.
           document.latestLineTable = LineTable(edit.text)
+          document.latestSyntacticTokens = []
         }
 
       }
 
       document.latestVersion = newVersion
+      return document.latestSnapshot
+    }
+  }
+
+  /// Replaces the semantic tokens for a document.
+  ///
+  /// - parameter uri: The URI of the document to be updated
+  /// - parameter tokens: The tokens to be used
+  @discardableResult
+  public func replaceSemanticTokens(
+    _ uri: DocumentURI,
+    tokens: [SemanticToken]
+  ) throws -> DocumentSnapshot {
+    return try queue.sync {
+      guard let document = documents[uri] else {
+        throw Error.missingDocument(uri)
+      }
+
+      document.latestSemanticTokens = tokens
+      return document.latestSnapshot
+    }
+  }
+
+  /// Adds the given the syntactic tokens to a document.
+  ///
+  /// - parameter uri: The URI of the document to be updated
+  /// - parameter tokens: The tokens to be added
+  @discardableResult
+  public func addSyntacticTokens(
+    _ uri: DocumentURI,
+    tokens: [SemanticToken]
+  ) throws -> DocumentSnapshot {
+    return try queue.sync {
+      guard let document = documents[uri] else {
+        throw Error.missingDocument(uri)
+      }
+
+      document.latestSyntacticTokens += tokens
       return document.latestSnapshot
     }
   }

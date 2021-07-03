@@ -161,6 +161,62 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
     }
   }
 
+  /// Update syntactic tokens for the given `snapshot`.
+  func updateSyntacticTokens(
+    response: SKDResponseDictionary,
+    for snapshot: DocumentSnapshot
+  ) {
+    let uri = snapshot.document.uri
+    guard let skTokens: SKDResponseArray = response[keys.syntaxmap] else {
+      return
+    }
+
+    let tokenParser = SemanticTokenParser(
+      sourcekitd: sourcekitd,
+      snapshot: snapshot
+    )
+    let tokens = tokenParser.parseTokens(skTokens)
+
+    do {
+      try documentManager.addSyntacticTokens(uri, tokens: tokens)
+      _ = client.send(WorkspaceSemanticTokensRefreshRequest(), queue: queue) { result in
+        if let error = result.failure {
+          log("refreshing syntactic tokens for \(uri) failed: \(error)", level: .warning)
+        }
+      }
+    } catch {
+      log("updating syntactic tokens for \(uri) failed: \(error)", level: .warning)
+    }
+  }
+
+  /// Update semantic tokens for the given `snapshot`.
+  func updateSemanticTokens(
+    response: SKDResponseDictionary,
+    for snapshot: DocumentSnapshot
+  ) {
+    let uri = snapshot.document.uri
+    guard let skTokens: SKDResponseArray = response[keys.annotations] else {
+      return
+    }
+
+    let tokenParser = SemanticTokenParser(
+      sourcekitd: sourcekitd,
+      snapshot: snapshot
+    )
+    let tokens = tokenParser.parseTokens(skTokens)
+
+    do {
+      try documentManager.replaceSemanticTokens(uri, tokens: tokens)
+      _ = client.send(WorkspaceSemanticTokensRefreshRequest(), queue: queue) { result in
+        if let error = result.failure {
+          log("refreshing semantic tokens for \(uri) failed: \(error)", level: .warning)
+        }
+      }
+    } catch {
+      log("updating semantic tokens for \(uri) failed: \(error)", level: .warning)
+    }
+  }
+
   /// Publish diagnostics for the given `snapshot`. We withhold semantic diagnostics if we are using
   /// fallback arguments.
   ///
@@ -211,7 +267,7 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
     }
     let compileCommand = self.commandsByFile[uri]
 
-    // Make the magic 0,0 replacetext request to update diagnostics.
+    // Make the magic 0,0 replacetext request to update diagnostics and semantic tokens.
 
     let req = SKDRequestDictionary(sourcekitd: sourcekitd)
     req[keys.request] = requests.editor_replacetext
@@ -222,6 +278,7 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
 
     if let dict = try? self.sourcekitd.sendSync(req) {
       publishDiagnostics(response: dict, for: snapshot, compileCommand: compileCommand)
+      updateSemanticTokens(response: dict, for: snapshot)
     }
   }
 }
@@ -254,7 +311,13 @@ extension SwiftLanguageServer {
       colorProvider: .bool(true),
       foldingRangeProvider: .bool(true),
       executeCommandProvider: ExecuteCommandOptions(
-        commands: builtinSwiftCommands)
+        commands: builtinSwiftCommands),
+      semanticTokensProvider: SemanticTokensOptions(
+        legend: SemanticTokensLegend(
+          tokenTypes: SemanticToken.Kind.allCases.map(\.lspTokenType),
+          tokenModifiers: []), // TODO: Add support for modifiers
+        range: .bool(false), // TODO: Add support for ranged semantic tokens
+        full: .bool(true))
     ))
   }
 
@@ -285,7 +348,8 @@ extension SwiftLanguageServer {
   /// Should be called on self.queue.
   private func reopenDocument(_ snapshot: DocumentSnapshot, _ compileCmd: SwiftCompileCommand?) {
     let keys = self.keys
-    let path = snapshot.document.uri.pseudoPath
+    let uri = snapshot.document.uri
+    let path = uri.pseudoPath
 
     let closeReq = SKDRequestDictionary(sourcekitd: self.sourcekitd)
     closeReq[keys.request] = self.requests.editor_close
@@ -306,6 +370,7 @@ extension SwiftLanguageServer {
     }
     self.publishDiagnostics(
         response: dict, for: snapshot, compileCommand: compileCmd)
+    self.updateSyntacticTokens(response: dict, for: snapshot)
   }
 
   public func documentUpdatedBuildSettings(_ uri: DocumentURI, change: FileBuildSettingsChange) {
@@ -370,6 +435,7 @@ extension SwiftLanguageServer {
         return
       }
       self.publishDiagnostics(response: dict, for: snapshot, compileCommand: compileCommand)
+      self.updateSyntacticTokens(response: dict, for: snapshot)
     }
   }
 
@@ -426,6 +492,7 @@ extension SwiftLanguageServer {
       if let dict = lastResponse, let snapshot = snapshot {
         let compileCommand = self.commandsByFile[note.textDocument.uri]
         self.publishDiagnostics(response: dict, for: snapshot, compileCommand: compileCommand)
+        self.updateSyntacticTokens(response: dict, for: snapshot)
       }
     }
   }
@@ -703,8 +770,43 @@ extension SwiftLanguageServer {
   }
 
   public func documentSemanticTokens(_ req: Request<DocumentSemanticTokensRequest>) {
-    // FIXME: implement semantic tokens support.
-    req.reply(nil)
+    let uri = req.params.textDocument.uri
+
+    queue.async {
+      guard let snapshot = self.documentManager.latestSnapshot(uri) else {
+        log("failed to find snapshot for uri \(uri)")
+        req.reply(DocumentSemanticTokensResponse(data: []))
+        return
+      }
+
+      /// Computes the LSP representation of semantic tokens
+      func toIntArray(tokens: [SemanticToken]) -> [UInt32] {
+        var current = Position(line: 0, utf16index: 0)
+
+        return tokens
+          .reduce([]) { acc, next in
+            let previous = Position(
+              line: current.line,
+              utf16index: current.line == next.start.line ? current.utf16index : 0
+            )
+            current = next.start
+            return acc + [
+              next.start.line - previous.line,
+              next.start.utf16index - previous.utf16index,
+              next.length,
+              next.kind.rawValue,
+              0 // TODO: Modifiers
+            ].map(UInt32.init)
+          }
+      }
+
+      var tokens = snapshot.syntacticTokens + snapshot.semanticTokens
+      tokens.sort { $0.start < $1.start }
+
+      let encodedTokens = toIntArray(tokens: tokens)
+
+      req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
+    }
   }
 
   public func documentSemanticTokensDelta(_ req: Request<DocumentSemanticTokensDeltaRequest>) {
