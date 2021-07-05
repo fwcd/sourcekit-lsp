@@ -64,6 +64,8 @@ public struct SemanticToken: Hashable {
     case parameter
     case property
     case label
+    case number
+    case string
 
     var lspTokenType: String {
       switch self {
@@ -105,6 +107,10 @@ public struct SemanticToken: Hashable {
         return "property"
       case .label:
         return "label"
+      case .number:
+        return "number"
+      case .string:
+        return "string"
       }
     }
   }
@@ -223,10 +229,15 @@ struct SemanticTokenParser {
       return .variable
     case values.decl_var_parameter:
       return .parameter
-    case values.syntaxtype_comment:
+    case values.syntaxtype_comment,
+         values.syntaxtype_doccomment:
       return .comment
     case values.syntaxtype_type_identifier:
       return .type
+    case values.syntaxtype_number:
+      return .number
+    case values.syntaxtype_string:
+      return .string
     default:
       return nil
     }

@@ -130,6 +130,11 @@ final class SemanticTokensTests: XCTestCase {
         kind: .keyword
       ),
       SemanticToken(
+        start: Position(line: 1, utf16index: 8),
+        length: 1,
+        kind: .number
+      ),
+      SemanticToken(
         start: Position(line: 2, utf16index: 0),
         length: 3,
         kind: .keyword
@@ -151,9 +156,19 @@ final class SemanticTokensTests: XCTestCase {
         kind: .keyword
       ),
       SemanticToken(
+        start: Position(line: 0, utf16index: 8),
+        length: 1,
+        kind: .number
+      ),
+      SemanticToken(
         start: Position(line: 1, utf16index: 0),
         length: 3,
         kind: .keyword
+      ),
+      SemanticToken(
+        start: Position(line: 1, utf16index: 8),
+        length: 6,
+        kind: .string
       ),
       SemanticToken(
         start: Position(line: 2, utf16index: 0),
