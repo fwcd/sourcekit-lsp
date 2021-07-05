@@ -230,7 +230,21 @@ public final class DocumentManager {
         throw Error.missingDocument(uri)
       }
 
-      document.latestSyntacticTokens += tokens
+      if !tokens.isEmpty {
+        // Remove all tokens that overlap with previous tokens
+
+        func removeAllOverlapping(tokens existingTokens: inout [SemanticToken]) {
+          existingTokens.removeAll { existing in
+            tokens.contains { existing.range.overlaps($0.range) }
+          }
+        }
+
+        removeAllOverlapping(tokens: &document.latestSyntacticTokens)
+        removeAllOverlapping(tokens: &document.latestSemanticTokens)
+
+        document.latestSyntacticTokens += tokens
+      }
+
       return document.latestSnapshot
     }
   }
