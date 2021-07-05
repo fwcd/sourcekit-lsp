@@ -15,7 +15,7 @@ import LanguageServerProtocol
 import LSPLogging
 
 /// A ranged token in the document used for semantic syntax highlighting.
-public struct SemanticToken {
+public struct SemanticToken: Hashable {
   public var name: String?
   public var start: Position
   public var length: Int
@@ -28,11 +28,23 @@ public struct SemanticToken {
     start..<end
   }
 
+  public init(
+    name: String? = nil,
+    start: Position,
+    length: Int,
+    kind: Kind
+  ) {
+    self.name = name
+    self.start = start
+    self.length = length
+    self.kind = kind
+  }
+
   // TODO: Modifiers
 
   /// The token type. Represented using an int to make the conversion to
   /// LSP tokens efficient.
-  public enum Kind: Int, CaseIterable {
+  public enum Kind: Int, CaseIterable, Hashable {
     case comment = 0
     case keyword
     case modifier
