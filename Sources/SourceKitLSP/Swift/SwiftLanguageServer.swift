@@ -316,7 +316,7 @@ extension SwiftLanguageServer {
         legend: SemanticTokensLegend(
           tokenTypes: SemanticToken.Kind.allCases.map(\.lspTokenType),
           tokenModifiers: []), // TODO: Add support for modifiers
-        range: .bool(false), // TODO: Add support for ranged semantic tokens
+        range: .bool(true),
         full: .bool(true))
     ))
   }
@@ -769,6 +769,27 @@ extension SwiftLanguageServer {
     }
   }
 
+  /// Computes the LSP representation of semantic tokens
+  private func encodeToIntArray(tokens: [SemanticToken]) -> [UInt32] {
+    var current = Position(line: 0, utf16index: 0)
+
+    return tokens
+      .reduce([]) { acc, next in
+        let previous = Position(
+          line: current.line,
+          utf16index: current.line == next.start.line ? current.utf16index : 0
+        )
+        current = next.start
+        return acc + [
+          next.start.line - previous.line,
+          next.start.utf16index - previous.utf16index,
+          next.length,
+          next.kind.rawValue,
+          0 // TODO: Modifiers
+        ].map(UInt32.init)
+      }
+  }
+
   public func documentSemanticTokens(_ req: Request<DocumentSemanticTokensRequest>) {
     let uri = req.params.textDocument.uri
 
@@ -779,44 +800,36 @@ extension SwiftLanguageServer {
         return
       }
 
-      /// Computes the LSP representation of semantic tokens
-      func toIntArray(tokens: [SemanticToken]) -> [UInt32] {
-        var current = Position(line: 0, utf16index: 0)
-
-        return tokens
-          .reduce([]) { acc, next in
-            let previous = Position(
-              line: current.line,
-              utf16index: current.line == next.start.line ? current.utf16index : 0
-            )
-            current = next.start
-            return acc + [
-              next.start.line - previous.line,
-              next.start.utf16index - previous.utf16index,
-              next.length,
-              next.kind.rawValue,
-              0 // TODO: Modifiers
-            ].map(UInt32.init)
-          }
-      }
-
-      var tokens = snapshot.syntacticTokens + snapshot.semanticTokens
-      tokens.sort { $0.start < $1.start }
-
-      let encodedTokens = toIntArray(tokens: tokens)
+      let tokens = snapshot.allTokens.sorted { $0.start < $1.start }
+      let encodedTokens = self.encodeToIntArray(tokens: tokens)
 
       req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
     }
   }
 
   public func documentSemanticTokensDelta(_ req: Request<DocumentSemanticTokensDeltaRequest>) {
-    // FIXME: implement semantic tokens support.
+    // FIXME: implement semantic tokens delta support.
     req.reply(nil)
   }
 
   public func documentSemanticTokensRange(_ req: Request<DocumentSemanticTokensRangeRequest>) {
-    // FIXME: implement semantic tokens support.
-    req.reply(nil)
+    let uri = req.params.textDocument.uri
+    let range = req.params.range
+
+    queue.async {
+      guard let snapshot = self.documentManager.latestSnapshot(uri) else {
+        log("failed to find snapshot for uri \(uri)")
+        req.reply(DocumentSemanticTokensResponse(data: []))
+        return
+      }
+
+      let tokens = snapshot.allTokens
+        .filter { $0.range.overlaps(range) }
+        .sorted { $0.start < $1.start }
+      let encodedTokens = self.encodeToIntArray(tokens: tokens)
+
+      req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
+    }
   }
 
   public func colorPresentation(_ req: Request<ColorPresentationRequest>) {

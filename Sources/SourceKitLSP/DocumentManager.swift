@@ -21,7 +21,9 @@ public struct DocumentSnapshot {
   public var lineTable: LineTable
   public var syntacticTokens: [SemanticToken]
   public var semanticTokens: [SemanticToken]
-  public var text: String { return lineTable.content }
+
+  public var text: String { lineTable.content }
+  public var allTokens: [SemanticToken] { syntacticTokens + semanticTokens }
 
   public init(
     document: Document,
