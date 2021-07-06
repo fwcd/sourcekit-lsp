@@ -179,11 +179,6 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
 
     do {
       try documentManager.addSyntacticTokens(uri, tokens: tokens)
-      _ = client.send(WorkspaceSemanticTokensRefreshRequest(), queue: queue) { result in
-        if let error = result.failure {
-          log("refreshing syntactic tokens for \(uri) failed: \(error)", level: .warning)
-        }
-      }
     } catch {
       log("updating syntactic tokens for \(uri) failed: \(error)", level: .warning)
     }
@@ -207,9 +202,11 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
 
     do {
       try documentManager.replaceSemanticTokens(uri, tokens: tokens)
-      _ = client.send(WorkspaceSemanticTokensRefreshRequest(), queue: queue) { result in
-        if let error = result.failure {
-          log("refreshing semantic tokens for \(uri) failed: \(error)", level: .warning)
+      if clientCapabilities.workspace?.semanticTokens?.refreshSupport ?? false {
+        _ = client.send(WorkspaceSemanticTokensRefreshRequest(), queue: queue) { result in
+          if let error = result.failure {
+            log("refreshing semantic tokens for \(uri) failed: \(error)", level: .warning)
+          }
         }
       }
     } catch {
@@ -769,27 +766,6 @@ extension SwiftLanguageServer {
     }
   }
 
-  /// Computes the LSP representation of semantic tokens
-  private func encodeToIntArray(tokens: [SemanticToken]) -> [UInt32] {
-    var current = Position(line: 0, utf16index: 0)
-
-    return tokens
-      .reduce([]) { acc, next in
-        let previous = Position(
-          line: current.line,
-          utf16index: current.line == next.start.line ? current.utf16index : 0
-        )
-        current = next.start
-        return acc + [
-          next.start.line - previous.line,
-          next.start.utf16index - previous.utf16index,
-          next.length,
-          next.kind.rawValue,
-          0 // TODO: Modifiers
-        ].map(UInt32.init)
-      }
-  }
-
   public func documentSemanticTokens(_ req: Request<DocumentSemanticTokensRequest>) {
     let uri = req.params.textDocument.uri
 
@@ -801,7 +777,7 @@ extension SwiftLanguageServer {
       }
 
       let tokens = snapshot.allTokens.sorted { $0.start < $1.start }
-      let encodedTokens = self.encodeToIntArray(tokens: tokens)
+      let encodedTokens = encodeToIntArray(semanticTokens: tokens)
 
       req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
     }
@@ -826,7 +802,7 @@ extension SwiftLanguageServer {
       let tokens = snapshot.allTokens
         .filter { $0.range.overlaps(range) }
         .sorted { $0.start < $1.start }
-      let encodedTokens = self.encodeToIntArray(tokens: tokens)
+      let encodedTokens = encodeToIntArray(semanticTokens: tokens)
 
       req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
     }

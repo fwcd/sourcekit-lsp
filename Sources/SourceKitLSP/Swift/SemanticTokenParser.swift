@@ -16,7 +16,6 @@ import LSPLogging
 
 /// A ranged token in the document used for semantic syntax highlighting.
 public struct SemanticToken: Hashable {
-  public var name: String?
   public var start: Position
   public var length: Int
   public var kind: Kind
@@ -34,7 +33,6 @@ public struct SemanticToken: Hashable {
     length: Int,
     kind: Kind
   ) {
-    self.name = name
     self.start = start
     self.length = length
     self.kind = kind
@@ -58,7 +56,6 @@ public struct SemanticToken: Hashable {
     case `enum`
     case typeParameter
     case function
-    case member
     case macro
     case variable
     case parameter
@@ -95,8 +92,6 @@ public struct SemanticToken: Hashable {
         return "typeParameter"
       case .function:
         return "function"
-      case .member:
-        return "member"
       case .macro:
         return "macro"
       case .variable:
@@ -116,6 +111,64 @@ public struct SemanticToken: Hashable {
   }
 }
 
+/// Encodes to the LSP representation of semantic tokens.
+public func encodeToIntArray(semanticTokens tokens: [SemanticToken]) -> [UInt32] {
+  var current = Position(line: 0, utf16index: 0)
+  var rawTokens: [UInt32] = []
+  rawTokens.reserveCapacity(tokens.count * 5)
+
+  for token in tokens {
+    let previous = Position(
+      line: current.line,
+      utf16index: current.line == token.start.line ? current.utf16index : 0
+    )
+    current = token.start
+    rawTokens += [
+      token.start.line - previous.line,
+      token.start.utf16index - previous.utf16index,
+      token.length,
+      token.kind.rawValue,
+      0 // TODO: Modifiers
+    ].map(UInt32.init)
+  }
+
+  return rawTokens
+}
+
+/// Decodes the LSP representation of semantic tokens
+public func decodeFromIntArray(rawSemanticTokens rawTokens: [UInt32]) -> [SemanticToken] {
+  var current = Position(line: 0, utf16index: 0)
+  var tokens: [SemanticToken] = []
+  tokens.reserveCapacity(rawTokens.count / 5)
+
+  for i in stride(from: 0, to: rawTokens.count, by: 5) {
+    let lineDelta = Int(rawTokens[i])
+    let charDelta = Int(rawTokens[i + 1])
+    let length = Int(rawTokens[i + 2])
+    let rawKind = Int(rawTokens[i + 3])
+    let rawModifiers = Int(rawTokens[i + 4])
+
+    current.line += lineDelta
+
+    if lineDelta == 0 {
+      current.utf16index += charDelta
+    } else {
+      current.utf16index = charDelta
+    }
+
+    if let kind = SemanticToken.Kind(rawValue: rawKind) {
+      tokens.append(SemanticToken(
+        start: current,
+        length: length,
+        kind: kind
+      ))
+    }
+  }
+
+  return tokens
+}
+
+/// Parses semantic tokens from sourcekitd response dictionaries.
 struct SemanticTokenParser {
   private let sourcekitd: SourceKitD
   private let snapshot: DocumentSnapshot
@@ -136,12 +189,9 @@ struct SemanticTokenParser {
       return []
     }
 
-    let name: String? = response[keys.name]
-    let validName = validTokenName(name: name, kind: kind)
     let token = SemanticToken(
-      name: name,
       start: start,
-      length: validName?.count ?? length,
+      length: length,
       kind: kind
     )
 
@@ -240,21 +290,6 @@ struct SemanticTokenParser {
       return .string
     default:
       return nil
-    }
-  }
-
-  private func validTokenName(name: String?, kind: SemanticToken.Kind?) -> String? {
-    guard let name = name,
-          let kind = kind else {
-      return nil
-    }
-    switch kind {
-    case .function:
-      // functions/method names are returned as f.e. 'foo(a:b:)' since we care
-      // about only function name, we have to adjust it a little bit
-      return String(name.split(separator: "(").first ?? "")
-    default:
-      return name
     }
   }
 }

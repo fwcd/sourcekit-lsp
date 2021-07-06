@@ -36,42 +36,17 @@ final class SemanticTokensTests: XCTestCase {
       rootPath: nil,
       rootURI: nil,
       initializationOptions: nil,
-      capabilities: ClientCapabilities(workspace: nil, textDocument: nil),
+      capabilities: ClientCapabilities(
+        workspace: .init(
+          semanticTokens: .init(
+            refreshSupport: true
+          )
+        ),
+        textDocument: nil
+      ),
       trace: .off,
       workspaceFolders: nil
     ))
-  }
-
-  /// Decodes the LSP representation of semantic tokens
-  private func decodeFromIntArray(tokens encodedTokens: [UInt32]) -> [SemanticToken] {
-    var current = Position(line: 0, utf16index: 0)
-    var tokens: [SemanticToken] = []
-
-    for i in stride(from: 0, to: encodedTokens.count, by: 5) {
-      let lineDelta = Int(encodedTokens[i])
-      let charDelta = Int(encodedTokens[i + 1])
-      let length = Int(encodedTokens[i + 2])
-      let rawKind = Int(encodedTokens[i + 3])
-      let rawModifiers = Int(encodedTokens[i + 4])
-
-      current.line += lineDelta
-
-      if lineDelta == 0 {
-        current.utf16index += charDelta
-      } else {
-        current.utf16index = charDelta
-      }
-
-      if let kind = SemanticToken.Kind(rawValue: rawKind) {
-        tokens.append(SemanticToken(
-          start: current,
-          length: length,
-          kind: kind
-        ))
-      }
-    }
-
-    return tokens
   }
 
   private func performSemanticTokensRequest(text: String, range: Range<Position>? = nil) -> [SemanticToken] {
@@ -104,7 +79,7 @@ final class SemanticTokensTests: XCTestCase {
       response = try! sk.sendSync(DocumentSemanticTokensRequest(textDocument: textDocument))
     }
 
-    return decodeFromIntArray(tokens: response.data)
+    return decodeFromIntArray(rawSemanticTokens: response.data)
   }
 
   func testEmpty() {
