@@ -102,8 +102,10 @@ final class SemanticTokensTests: XCTestCase {
     let tokens = performSemanticTokensRequest(text: text, range: start..<end)
     XCTAssertEqual(tokens, [
       SemanticToken(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 1, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
       SemanticToken(start: Position(line: 1, utf16index: 8), length: 1, kind: .number),
       SemanticToken(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 2, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
     ])
   }
 
@@ -151,9 +153,11 @@ final class SemanticTokensTests: XCTestCase {
     XCTAssertEqual(tokens, [
       // let x = 3
       SemanticToken(start: Position(line: 0, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 0, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
       SemanticToken(start: Position(line: 0, utf16index: 8), length: 1, kind: .number),
       // var y = "test"
       SemanticToken(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 1, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
       SemanticToken(start: Position(line: 1, utf16index: 8), length: 6, kind: .string),
       // /* abc */ // 123
       SemanticToken(start: Position(line: 2, utf16index: 0), length: 9, kind: .comment),
@@ -178,17 +182,22 @@ final class SemanticTokensTests: XCTestCase {
     XCTAssertEqual(tokens, [
       // struct X {}
       SemanticToken(start: Position(line: 0, utf16index: 0), length: 6, kind: .keyword),
+      SemanticToken(start: Position(line: 0, utf16index: 7), length: 1, kind: .struct, modifiers: .declaration),
       // let x = X()
       SemanticToken(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 2, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
       SemanticToken(start: Position(line: 2, utf16index: 8), length: 1, kind: .struct),
       // let y = x + x
       SemanticToken(start: Position(line: 3, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 3, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
       SemanticToken(start: Position(line: 3, utf16index: 8), length: 1, kind: .variable),
       SemanticToken(start: Position(line: 3, utf16index: 12), length: 1, kind: .variable),
       // func a() {}
       SemanticToken(start: Position(line: 5, utf16index: 0), length: 4, kind: .keyword),
+      SemanticToken(start: Position(line: 5, utf16index: 5), length: 3, kind: .function, modifiers: .declaration),
       // let b = {}
       SemanticToken(start: Position(line: 6, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 6, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
       // a()
       SemanticToken(start: Position(line: 8, utf16index: 0), length: 1, kind: .function),
       // b()
@@ -209,15 +218,20 @@ final class SemanticTokensTests: XCTestCase {
     XCTAssertEqual(tokens, [
       // protocol X {}
       SemanticToken(start: Position(line: 0, utf16index: 0), length: 8, kind: .keyword),
+      SemanticToken(start: Position(line: 0, utf16index: 9), length: 1, kind: .interface, modifiers: .declaration),
       // class Y: X {}
       SemanticToken(start: Position(line: 1, utf16index: 0), length: 5, kind: .keyword),
+      SemanticToken(start: Position(line: 1, utf16index: 6), length: 1, kind: .class, modifiers: .declaration),
       SemanticToken(start: Position(line: 1, utf16index: 9), length: 1, kind: .interface),
       // let y: Y = X()
       SemanticToken(start: Position(line: 3, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 3, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
       SemanticToken(start: Position(line: 3, utf16index: 7), length: 1, kind: .class),
       SemanticToken(start: Position(line: 3, utf16index: 11), length: 1, kind: .interface),
       // func f<T: X>() {}
       SemanticToken(start: Position(line: 5, utf16index: 0), length: 4, kind: .keyword),
+      SemanticToken(start: Position(line: 5, utf16index: 5), length: 9, kind: .function, modifiers: .declaration),
+      SemanticToken(start: Position(line: 5, utf16index: 7), length: 1, kind: .typeParameter, modifiers: .declaration),
       SemanticToken(start: Position(line: 5, utf16index: 10), length: 1, kind: .interface),
     ])
   }
