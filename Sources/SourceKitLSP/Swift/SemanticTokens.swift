@@ -204,6 +204,14 @@ public func decodeFromIntArray(rawSemanticTokens rawTokens: [UInt32]) -> [Semant
   return tokens
 }
 
+/// Merges the given token arrays into a new token array,
+/// preferring the second array's tokens if duplicate ranges are
+/// found.
+public func mergeSemanticTokens(_ lhs: [SemanticToken], _ rhs: [SemanticToken]) -> [SemanticToken] {
+  let rhsRanges = Set(rhs.map(\.range))
+  return lhs.filter { !rhsRanges.contains($0.range) } + rhs
+}
+
 /// Parses semantic tokens from sourcekitd response dictionaries.
 struct SemanticTokenParser {
   private let sourcekitd: SourceKitD
