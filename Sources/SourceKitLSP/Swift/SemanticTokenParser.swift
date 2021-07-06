@@ -245,10 +245,13 @@ struct SemanticTokenParser {
       return .typeParameter
     case values.decl_function_constructor,
          values.decl_function_subscript,
+         values.decl_function_free,
          values.decl_function_method_static,
          values.decl_function_method_instance,
          values.decl_function_method_class,
          values.ref_function_constructor,
+         values.ref_function_destructor,
+         values.ref_function_free,
          values.ref_function_subscript,
          values.ref_function_method_static,
          values.ref_function_method_instance,
@@ -261,8 +264,6 @@ struct SemanticTokenParser {
          values.ref_function_operator_postfix,
          values.ref_function_operator_infix:
       return .operator
-    case values.decl_function_free:
-      return .function
     case values.decl_var_static,
          values.decl_var_class,
          values.decl_var_instance,

@@ -115,10 +115,13 @@ final class SemanticTokensTests: XCTestCase {
     """
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
+      // let x = 3
       SemanticToken(start: Position(line: 0, utf16index: 0), length: 3, kind: .keyword),
       SemanticToken(start: Position(line: 0, utf16index: 8), length: 1, kind: .number),
+      // var y = "test"
       SemanticToken(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
       SemanticToken(start: Position(line: 1, utf16index: 8), length: 6, kind: .string),
+      // /* abc */ // 123
       SemanticToken(start: Position(line: 2, utf16index: 0), length: 9, kind: .comment),
       SemanticToken(start: Position(line: 2, utf16index: 10), length: 6, kind: .comment),
     ])
@@ -130,15 +133,32 @@ final class SemanticTokensTests: XCTestCase {
 
     let x = X()
     let y = x + x
+
+    func a() {}
+    let b = {}
+
+    a()
+    b()
     """
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
+      // struct X {}
       SemanticToken(start: Position(line: 0, utf16index: 0), length: 6, kind: .keyword),
+      // let x = X()
       SemanticToken(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
       SemanticToken(start: Position(line: 2, utf16index: 8), length: 1, kind: .struct),
+      // let y = x + x
       SemanticToken(start: Position(line: 3, utf16index: 0), length: 3, kind: .keyword),
       SemanticToken(start: Position(line: 3, utf16index: 8), length: 1, kind: .variable),
       SemanticToken(start: Position(line: 3, utf16index: 12), length: 1, kind: .variable),
+      // func a() {}
+      SemanticToken(start: Position(line: 5, utf16index: 0), length: 4, kind: .keyword),
+      // let b = {}
+      SemanticToken(start: Position(line: 6, utf16index: 0), length: 3, kind: .keyword),
+      // a()
+      SemanticToken(start: Position(line: 8, utf16index: 0), length: 1, kind: .function),
+      // b()
+      SemanticToken(start: Position(line: 9, utf16index: 0), length: 1, kind: .variable),
     ])
   }
 }
