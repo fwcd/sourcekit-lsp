@@ -58,6 +58,7 @@ public struct SemanticToken: Hashable {
     case typeParameter
     case function
     case macro
+    case method
     case variable
     case parameter
     case property
@@ -82,6 +83,7 @@ public struct SemanticToken: Hashable {
       case .typeParameter: return "typeParameter"
       case .function: return "function"
       case .macro: return "macro"
+      case .method: return "method"
       case .variable: return "variable"
       case .parameter: return "parameter"
       case .property: return "property"
@@ -285,19 +287,21 @@ struct SemanticTokenParser {
       return (.typeParameter, [])
     case values.decl_function_constructor,
          values.decl_function_subscript,
-         values.decl_function_free,
-         values.decl_function_method_static,
+         values.decl_function_free:
+      return (.function, [.declaration])
+    case values.decl_function_method_static,
          values.decl_function_method_instance,
          values.decl_function_method_class:
-      return (.function, [.declaration])
+      return (.method, [.declaration])
     case values.ref_function_constructor,
          values.ref_function_destructor,
          values.ref_function_free,
-         values.ref_function_subscript,
-         values.ref_function_method_static,
+         values.ref_function_subscript:
+      return (.function, [])
+    case values.ref_function_method_static,
          values.ref_function_method_instance,
          values.ref_function_method_class:
-      return (.function, [])
+      return (.method, [])
     case values.decl_function_operator_prefix,
          values.decl_function_operator_postfix,
          values.decl_function_operator_infix:
