@@ -167,15 +167,29 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
     for snapshot: DocumentSnapshot
   ) {
     let uri = snapshot.document.uri
-    let tokenParser = SemanticTokenParser(
-      sourcekitd: sourcekitd,
-      snapshot: snapshot
-    )
 
     if let syntaxMap: SKDResponseArray = response[keys.syntaxmap] {
+      let tokenParser = SemanticTokenParser(
+        sourcekitd: sourcekitd,
+        snapshot: snapshot
+      )
       let tokens = tokenParser.parseTokens(syntaxMap)
       do {
         try documentManager.addLexicalTokens(uri, tokens: tokens)
+      } catch {
+        log("updating lexical tokens for \(uri) failed: \(error)", level: .warning)
+      }
+    }
+
+    if let substructure: SKDResponseArray = response[keys.substructure] {
+      let tokenParser = SemanticTokenParser(
+        sourcekitd: sourcekitd,
+        snapshot: snapshot,
+        useName: true
+      )
+      let tokens = tokenParser.parseTokens(substructure)
+      do {
+        try documentManager.replaceSyntacticTokens(uri, tokens: tokens)
       } catch {
         log("updating lexical tokens for \(uri) failed: \(error)", level: .warning)
       }

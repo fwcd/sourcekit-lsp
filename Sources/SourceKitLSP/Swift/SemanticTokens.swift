@@ -216,38 +216,37 @@ public func mergeSemanticTokens(_ lhs: [SemanticToken], _ rhs: [SemanticToken]) 
 struct SemanticTokenParser {
   private let sourcekitd: SourceKitD
   private let snapshot: DocumentSnapshot
+  private let useName: Bool
 
-  init(sourcekitd: SourceKitD, snapshot: DocumentSnapshot) {
+  init(sourcekitd: SourceKitD, snapshot: DocumentSnapshot, useName: Bool = false) {
     self.sourcekitd = sourcekitd
     self.snapshot = snapshot
+    self.useName = useName
   }
 
   func parseTokens(_ response: SKDResponseDictionary) -> [SemanticToken] {
     let keys = sourcekitd.keys
+    var tokens: [SemanticToken] = []
 
-    guard let offset: Int = response[keys.offset],
+    if let offset: Int = useName ? response[keys.nameoffset] : response[keys.offset],
+          let length: Int = useName ? response[keys.namelength] : response[keys.length],
           let start: Position = snapshot.positionOf(utf8Offset: offset),
-          let length: Int = response[keys.length],
           let skKind: sourcekitd_uid_t = response[keys.kind],
-          let (kind, modifiers) = parseKindAndModifiers(skKind) else {
-      return []
+          let (kind, modifiers) = parseKindAndModifiers(skKind) {
+      let token = SemanticToken(
+        start: start,
+        length: length,
+        kind: kind,
+        modifiers: modifiers
+      )
+      tokens.append(token)
     }
 
-    let token = SemanticToken(
-      start: start,
-      length: length,
-      kind: kind,
-      modifiers: modifiers
-    )
-
-    let children: [SemanticToken]
     if let substructure: SKDResponseArray = response[keys.substructure] {
-      children = parseTokens(substructure)
-    } else {
-      children = []
+      tokens += parseTokens(substructure)
     }
 
-    return [token] + children
+    return tokens
   }
 
   func parseTokens(_ response: SKDResponseArray) -> [SemanticToken] {
