@@ -107,6 +107,40 @@ final class SemanticTokensTests: XCTestCase {
     ])
   }
 
+  func testIntArrayCoding() {
+    let tokens = [
+      SemanticToken(
+        start: Position(line: 2, utf16index: 3),
+        length: 5,
+        kind: .string
+      ),
+      SemanticToken(
+        start: Position(line: 4, utf16index: 2),
+        length: 1,
+        kind: .interface,
+        modifiers: [.deprecated, .definition]
+      ),
+    ]
+
+    let encoded = encodeToIntArray(semanticTokens: tokens)
+    XCTAssertEqual(encoded, [
+      2, // line delta
+      3, // char delta
+      5, // length
+      SemanticToken.Kind.string.rawValue, // kind
+      0, // modifiers
+
+      2, // line delta
+      2, // char delta
+      1, // length
+      SemanticToken.Kind.interface.rawValue, // kind
+      SemanticToken.Modifiers.deprecated.rawValue | SemanticToken.Modifiers.definition.rawValue, // modifiers
+    ])
+
+    let decoded = decodeFromIntArray(rawSemanticTokens: encoded)
+    XCTAssertEqual(decoded, tokens)
+  }
+
   func testSyntacticTokens() {
     let text = """
     let x = 3

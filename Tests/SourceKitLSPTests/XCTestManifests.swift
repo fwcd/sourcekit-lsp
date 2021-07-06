@@ -160,6 +160,7 @@ extension SemanticTokensTests {
     // to regenerate.
     static let __allTests__SemanticTokensTests = [
       ("testEmpty", testEmpty),
+      ("testIntArrayCoding", testIntArrayCoding),
       ("testRanged", testRanged),
       ("testSemanticTokens", testSemanticTokens),
       ("testSemanticTokensForProtocols", testSemanticTokensForProtocols),
