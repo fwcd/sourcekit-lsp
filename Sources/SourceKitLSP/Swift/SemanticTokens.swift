@@ -229,10 +229,10 @@ struct SemanticTokenParser {
     var tokens: [SemanticToken] = []
 
     if let offset: Int = useName ? response[keys.nameoffset] : response[keys.offset],
-          let length: Int = useName ? response[keys.namelength] : response[keys.length],
-          let start: Position = snapshot.positionOf(utf8Offset: offset),
-          let skKind: sourcekitd_uid_t = response[keys.kind],
-          let (kind, modifiers) = parseKindAndModifiers(skKind) {
+       let length: Int = useName ? response[keys.namelength] : response[keys.length],
+       let start: Position = snapshot.positionOf(utf8Offset: offset),
+       let skKind: sourcekitd_uid_t = response[keys.kind],
+       let (kind, modifiers) = parseKindAndModifiers(skKind) {
       let token = SemanticToken(
         start: start,
         length: length,
@@ -328,11 +328,14 @@ struct SemanticTokenParser {
     case values.decl_var_local,
          values.decl_var_global:
       return (.variable, [.declaration])
+    // We ignore `value.decl_var_parameter`s for now.
+    // SourceKit seems to use these to refer to parameter labels,
+    // therefore we don't use .parameter here (which LSP client like
+    // VSCode seem to interpret as variable identifiers, however
+    // causing a 'wrong highlighting' e.g. of `x` in `f(x y: Int) {}`)
     case values.ref_var_local,
          values.ref_var_global:
       return (.variable, [])
-    case values.decl_var_parameter:
-      return (.parameter, [.declaration])
     case values.syntaxtype_comment,
          values.syntaxtype_doccomment:
       return (.comment, [])
