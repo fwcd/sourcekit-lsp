@@ -15,30 +15,46 @@ import LanguageServerProtocol
 import LSPLogging
 import SKSupport
 
+public struct DocumentTokens {
+  /// Lexical tokens, e.g. keywords, raw identifiers, ...
+  public var lexical: [SemanticToken] = []
+  /// Syntactic tokens, e.g. declarations, etc.
+  public var syntactic: [SemanticToken] = []
+  /// Semantic tokens, e.g. variable references, type references, ...
+  public var semantic: [SemanticToken] = []
+
+  public var merged: [SemanticToken] {
+    [lexical, syntactic, semantic].reduce([], mergeSemanticTokens)
+  }
+  public var sorted: [SemanticToken] {
+    merged.sorted { $0.start < $1.start }
+  }
+
+  public mutating func withEachKind(_ action: (inout [SemanticToken]) -> Void) {
+    action(&lexical)
+    action(&syntactic)
+    action(&semantic)
+  }
+}
+
 public struct DocumentSnapshot {
   public var document: Document
   public var version: Int
   public var lineTable: LineTable
-  public var syntacticTokens: [SemanticToken]
-  public var semanticTokens: [SemanticToken]
+  public var tokens: DocumentTokens
 
   public var text: String { lineTable.content }
-
-  public var allTokens: [SemanticToken] { mergeSemanticTokens(syntacticTokens, semanticTokens) }
-  public var sortedTokens: [SemanticToken] { allTokens.sorted { $0.start < $1.start } }
 
   public init(
     document: Document,
     version: Int,
     lineTable: LineTable,
-    syntacticTokens: [SemanticToken],
-    semanticTokens: [SemanticToken]
+    tokens: DocumentTokens
   ) {
     self.document = document
     self.version = version
     self.lineTable = lineTable
-    self.syntacticTokens = syntacticTokens
-    self.semanticTokens = semanticTokens
+    self.tokens = tokens
   }
 
   func index(of pos: Position) -> String.Index? {
@@ -51,16 +67,14 @@ public final class Document {
   public let language: Language
   var latestVersion: Int
   var latestLineTable: LineTable
-  var latestSyntacticTokens: [SemanticToken]
-  var latestSemanticTokens: [SemanticToken]
+  var latestTokens: DocumentTokens
 
   init(uri: DocumentURI, language: Language, version: Int, text: String) {
     self.uri = uri
     self.language = language
     self.latestVersion = version
     self.latestLineTable = LineTable(text)
-    self.latestSyntacticTokens = []
-    self.latestSemanticTokens = []
+    self.latestTokens = DocumentTokens()
   }
 
   /// **Not thread safe!** Use `DocumentManager.latestSnapshot` instead.
@@ -69,8 +83,7 @@ public final class Document {
       document: self,
       version: latestVersion,
       lineTable: latestLineTable,
-      syntacticTokens: latestSyntacticTokens,
-      semanticTokens: latestSemanticTokens
+      tokens: latestTokens
     )
   }
 }
@@ -184,12 +197,11 @@ public final class DocumentManager {
               })
           }
 
-          update(tokens: &document.latestSyntacticTokens)
-          update(tokens: &document.latestSemanticTokens)
+          document.latestTokens.withEachKind(update(tokens:))
         } else {
           // Full text replacement.
           document.latestLineTable = LineTable(edit.text)
-          document.latestSyntacticTokens = []
+          document.latestTokens = DocumentTokens()
         }
 
       }
@@ -213,17 +225,36 @@ public final class DocumentManager {
         throw Error.missingDocument(uri)
       }
 
-      document.latestSemanticTokens = tokens
+      document.latestTokens.semantic = tokens
       return document.latestSnapshot
     }
   }
 
-  /// Adds the given the syntactic tokens to a document.
+  /// Replaces the syntactic tokens for a document.
+  ///
+  /// - parameter uri: The URI of the document to be updated
+  /// - parameter tokens: The tokens to be used
+  @discardableResult
+  public func replaceSyntacticTokens(
+    _ uri: DocumentURI,
+    tokens: [SemanticToken]
+  ) throws -> DocumentSnapshot {
+    return try queue.sync {
+      guard let document = documents[uri] else {
+        throw Error.missingDocument(uri)
+      }
+
+      document.latestTokens.syntactic = tokens
+      return document.latestSnapshot
+    }
+  }
+
+  /// Adds the given lexical tokens to a document.
   ///
   /// - parameter uri: The URI of the document to be updated
   /// - parameter tokens: The tokens to be added
   @discardableResult
-  public func addSyntacticTokens(
+  public func addLexicalTokens(
     _ uri: DocumentURI,
     tokens: [SemanticToken]
   ) throws -> DocumentSnapshot {
@@ -241,10 +272,8 @@ public final class DocumentManager {
           }
         }
 
-        removeAllOverlapping(tokens: &document.latestSyntacticTokens)
-        removeAllOverlapping(tokens: &document.latestSemanticTokens)
-
-        document.latestSyntacticTokens += tokens
+        document.latestTokens.withEachKind(removeAllOverlapping(tokens:))
+        document.latestTokens.lexical += tokens
       }
 
       return document.latestSnapshot

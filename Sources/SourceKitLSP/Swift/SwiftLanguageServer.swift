@@ -161,26 +161,24 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
     }
   }
 
-  /// Update syntactic tokens for the given `snapshot`.
-  func updateSyntacticTokens(
+  /// Update lexical and syntactic tokens for the given `snapshot`.
+  func updateLexicalAndSyntacticTokens(
     response: SKDResponseDictionary,
     for snapshot: DocumentSnapshot
   ) {
     let uri = snapshot.document.uri
-    guard let skTokens: SKDResponseArray = response[keys.syntaxmap] else {
-      return
-    }
-
     let tokenParser = SemanticTokenParser(
       sourcekitd: sourcekitd,
       snapshot: snapshot
     )
-    let tokens = tokenParser.parseTokens(skTokens)
 
-    do {
-      try documentManager.addSyntacticTokens(uri, tokens: tokens)
-    } catch {
-      log("updating syntactic tokens for \(uri) failed: \(error)", level: .warning)
+    if let syntaxMap: SKDResponseArray = response[keys.syntaxmap] {
+      let tokens = tokenParser.parseTokens(syntaxMap)
+      do {
+        try documentManager.addLexicalTokens(uri, tokens: tokens)
+      } catch {
+        log("updating lexical tokens for \(uri) failed: \(error)", level: .warning)
+      }
     }
   }
 
@@ -367,7 +365,7 @@ extension SwiftLanguageServer {
     }
     self.publishDiagnostics(
         response: dict, for: snapshot, compileCommand: compileCmd)
-    self.updateSyntacticTokens(response: dict, for: snapshot)
+    self.updateLexicalAndSyntacticTokens(response: dict, for: snapshot)
   }
 
   public func documentUpdatedBuildSettings(_ uri: DocumentURI, change: FileBuildSettingsChange) {
@@ -432,7 +430,7 @@ extension SwiftLanguageServer {
         return
       }
       self.publishDiagnostics(response: dict, for: snapshot, compileCommand: compileCommand)
-      self.updateSyntacticTokens(response: dict, for: snapshot)
+      self.updateLexicalAndSyntacticTokens(response: dict, for: snapshot)
     }
   }
 
@@ -489,7 +487,7 @@ extension SwiftLanguageServer {
       if let dict = lastResponse, let snapshot = snapshot {
         let compileCommand = self.commandsByFile[note.textDocument.uri]
         self.publishDiagnostics(response: dict, for: snapshot, compileCommand: compileCommand)
-        self.updateSyntacticTokens(response: dict, for: snapshot)
+        self.updateLexicalAndSyntacticTokens(response: dict, for: snapshot)
       }
     }
   }
@@ -776,7 +774,7 @@ extension SwiftLanguageServer {
         return
       }
 
-      let tokens = snapshot.sortedTokens
+      let tokens = snapshot.tokens.sorted
       let encodedTokens = encodeToIntArray(semanticTokens: tokens)
 
       req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
@@ -799,7 +797,7 @@ extension SwiftLanguageServer {
         return
       }
 
-      let tokens = snapshot.sortedTokens.filter { $0.range.overlaps(range) }
+      let tokens = snapshot.tokens.sorted.filter { $0.range.overlaps(range) }
       let encodedTokens = encodeToIntArray(semanticTokens: tokens)
 
       req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
