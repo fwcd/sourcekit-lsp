@@ -19,6 +19,7 @@ public struct SemanticToken: Hashable {
   public var start: Position
   public var length: Int
   public var kind: Kind
+  public var modifiers: Modifiers
 
   public var end: Position {
     Position(line: start.line, utf16index: start.utf16index + length)
@@ -31,18 +32,18 @@ public struct SemanticToken: Hashable {
     name: String? = nil,
     start: Position,
     length: Int,
-    kind: Kind
+    kind: Kind,
+    modifiers: Modifiers = []
   ) {
     self.start = start
     self.length = length
     self.kind = kind
+    self.modifiers = modifiers
   }
-
-  // TODO: Modifiers
 
   /// The token type. Represented using an int to make the conversion to
   /// LSP tokens efficient.
-  public enum Kind: Int, CaseIterable, Hashable {
+  public enum Kind: UInt32, CaseIterable, Hashable {
     case comment = 0
     case keyword
     case modifier
@@ -64,49 +65,80 @@ public struct SemanticToken: Hashable {
     case number
     case string
 
-    var lspTokenType: String {
+    /// The name of the token type used by LSP.
+    var lspName: String {
       switch self {
-      case .comment:
-        return "comment"
-      case .keyword:
-        return "keyword"
-      case .modifier: 
-        return "modifier"
-      case .regexp:
-        return "regexp"
-      case .operator:
-        return "operator"
-      case .namespace:
-        return "namespace"
-      case .type:
-        return "type"
-      case .struct:
-        return "struct"
-      case .class:
-        return "class"
-      case .interface:
-        return "interface"
-      case .enum:
-        return "enum"
-      case .typeParameter:
-        return "typeParameter"
-      case .function:
-        return "function"
-      case .macro:
-        return "macro"
-      case .variable:
-        return "variable"
-      case .parameter:
-        return "parameter"
-      case .property:
-        return "property"
-      case .label:
-        return "label"
-      case .number:
-        return "number"
-      case .string:
-        return "string"
+      case .comment: return "comment"
+      case .keyword: return "keyword"
+      case .modifier: return "modifier"
+      case .regexp: return "regexp"
+      case .operator: return "operator"
+      case .namespace: return "namespace"
+      case .type: return "type"
+      case .struct: return "struct"
+      case .class: return "class"
+      case .interface: return "interface"
+      case .enum: return "enum"
+      case .typeParameter: return "typeParameter"
+      case .function: return "function"
+      case .macro: return "macro"
+      case .variable: return "variable"
+      case .parameter: return "parameter"
+      case .property: return "property"
+      case .label: return "label"
+      case .number: return "number"
+      case .string: return "string"
       }
+    }
+  }
+
+  /// Additional metadata about a token.
+  public struct Modifiers: OptionSet, CaseIterable, Hashable {
+    public static let declaration = Self(rawValue: 1 << 0)
+    public static let definition = Self(rawValue: 1 << 1)
+    public static let readonly = Self(rawValue: 1 << 2)
+    public static let `static` = Self(rawValue: 1 << 3)
+    public static let deprecated = Self(rawValue: 1 << 4)
+    public static let abstract = Self(rawValue: 1 << 5)
+    public static let async = Self(rawValue: 1 << 6)
+    public static let modification = Self(rawValue: 1 << 7)
+    public static let documentation = Self(rawValue: 1 << 8)
+    public static let defaultLibrary = Self(rawValue: 1 << 9)
+
+    /// All available modifiers, in order
+    public static let allCases: [Self] = [
+      .declaration,
+      .definition,
+      .readonly,
+      .static,
+      .deprecated,
+      .abstract,
+      .async,
+      .modification,
+      .documentation,
+      .defaultLibrary,
+    ]
+
+    public let rawValue: UInt32
+
+    /// The name of the modifier used by LSP.
+    public var lspName: String? {
+      switch self {
+      case .declaration: return "declaration"
+      case .definition: return "definition"
+      case .static: return "static"
+      case .deprecated: return "deprecated"
+      case .abstract: return "abstract"
+      case .async: return "async"
+      case .modification: return "modification"
+      case .documentation: return "documentation"
+      case .defaultLibrary: return "defaultLibrary"
+      default: return nil
+      }
+    }
+
+    public init(rawValue: UInt32) {
+      self.rawValue = rawValue
     }
   }
 }
@@ -124,12 +156,12 @@ public func encodeToIntArray(semanticTokens tokens: [SemanticToken]) -> [UInt32]
     )
     current = token.start
     rawTokens += [
-      token.start.line - previous.line,
-      token.start.utf16index - previous.utf16index,
-      token.length,
+      UInt32(token.start.line - previous.line),
+      UInt32(token.start.utf16index - previous.utf16index),
+      UInt32(token.length),
       token.kind.rawValue,
-      0 // TODO: Modifiers
-    ].map(UInt32.init)
+      token.modifiers.rawValue
+    ]
   }
 
   return rawTokens
@@ -145,8 +177,11 @@ public func decodeFromIntArray(rawSemanticTokens rawTokens: [UInt32]) -> [Semant
     let lineDelta = Int(rawTokens[i])
     let charDelta = Int(rawTokens[i + 1])
     let length = Int(rawTokens[i + 2])
-    let rawKind = Int(rawTokens[i + 3])
-    let rawModifiers = Int(rawTokens[i + 4])
+    let rawKind = rawTokens[i + 3]
+    let rawModifiers = rawTokens[i + 4]
+
+    guard let kind = SemanticToken.Kind(rawValue: rawKind) else { continue }
+    let modifiers = SemanticToken.Modifiers(rawValue: rawModifiers)
 
     current.line += lineDelta
 
@@ -156,13 +191,12 @@ public func decodeFromIntArray(rawSemanticTokens rawTokens: [UInt32]) -> [Semant
       current.utf16index = charDelta
     }
 
-    if let kind = SemanticToken.Kind(rawValue: rawKind) {
-      tokens.append(SemanticToken(
-        start: current,
-        length: length,
-        kind: kind
-      ))
-    }
+    tokens.append(SemanticToken(
+      start: current,
+      length: length,
+      kind: kind,
+      modifiers: modifiers
+    ))
   }
 
   return tokens

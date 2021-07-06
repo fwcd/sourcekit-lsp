@@ -311,8 +311,8 @@ extension SwiftLanguageServer {
         commands: builtinSwiftCommands),
       semanticTokensProvider: SemanticTokensOptions(
         legend: SemanticTokensLegend(
-          tokenTypes: SemanticToken.Kind.allCases.map(\.lspTokenType),
-          tokenModifiers: []), // TODO: Add support for modifiers
+          tokenTypes: SemanticToken.Kind.allCases.map(\.lspName),
+          tokenModifiers: SemanticToken.Modifiers.allCases.compactMap(\.lspName)),
         range: .bool(true),
         full: .bool(true))
     ))
