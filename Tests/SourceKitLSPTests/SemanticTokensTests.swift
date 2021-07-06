@@ -52,15 +52,14 @@ final class SemanticTokensTests: XCTestCase {
   private func performSemanticTokensRequest(text: String, range: Range<Position>? = nil) -> [SemanticToken] {
     let url = URL(fileURLWithPath: "/\(#function)/a.swift")
 
-    // We wait for the first refresh request to make sure that the syntactic tokens are ready
-    // TODO: Await semantic tokens too
+    // We wait for the first refresh request to make sure that the semantic tokens are ready
 
-    let semaphore = DispatchSemaphore(value: 0)
-    sk.appendOneShotRequestHandler { (req: Request<WorkspaceSemanticTokensRefreshRequest>) in
+    let expectation = XCTestExpectation(description: "performSemanticTokensRequest - refresh received")
+    sk.handleNextRequest { (req: Request<WorkspaceSemanticTokensRefreshRequest>) in
+      expectation.fulfill()
       req.reply(VoidResponse())
-      semaphore.signal()
     }
-    
+
     sk.send(DidOpenTextDocumentNotification(textDocument: TextDocumentItem(
       uri: DocumentURI(url),
       language: .swift,
@@ -68,7 +67,10 @@ final class SemanticTokensTests: XCTestCase {
       text: text
     )))
 
-    semaphore.wait()
+    let waitResult = XCTWaiter.wait(for: [expectation], timeout: 15)
+    if waitResult != .completed {
+      fatalError("error \(waitResult) while waiting for semantic token refresh")
+    }
 
     let textDocument = TextDocumentIdentifier(url)
     let response: DocumentSemanticTokensResponse!
@@ -99,21 +101,9 @@ final class SemanticTokensTests: XCTestCase {
     let end = Position(line: 2, utf16index: 5)
     let tokens = performSemanticTokensRequest(text: text, range: start..<end)
     XCTAssertEqual(tokens, [
-      SemanticToken(
-        start: Position(line: 1, utf16index: 0),
-        length: 3,
-        kind: .keyword
-      ),
-      SemanticToken(
-        start: Position(line: 1, utf16index: 8),
-        length: 1,
-        kind: .number
-      ),
-      SemanticToken(
-        start: Position(line: 2, utf16index: 0),
-        length: 3,
-        kind: .keyword
-      ),
+      SemanticToken(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 1, utf16index: 8), length: 1, kind: .number),
+      SemanticToken(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
     ])
   }
 
@@ -125,52 +115,30 @@ final class SemanticTokensTests: XCTestCase {
     """
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
-      SemanticToken(
-        start: Position(line: 0, utf16index: 0),
-        length: 3,
-        kind: .keyword
-      ),
-      SemanticToken(
-        start: Position(line: 0, utf16index: 8),
-        length: 1,
-        kind: .number
-      ),
-      SemanticToken(
-        start: Position(line: 1, utf16index: 0),
-        length: 3,
-        kind: .keyword
-      ),
-      SemanticToken(
-        start: Position(line: 1, utf16index: 8),
-        length: 6,
-        kind: .string
-      ),
-      SemanticToken(
-        start: Position(line: 2, utf16index: 0),
-        length: 9,
-        kind: .comment
-      ),
-      SemanticToken(
-        start: Position(line: 2, utf16index: 10),
-        length: 6,
-        kind: .comment
-      ),
+      SemanticToken(start: Position(line: 0, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 0, utf16index: 8), length: 1, kind: .number),
+      SemanticToken(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 1, utf16index: 8), length: 6, kind: .string),
+      SemanticToken(start: Position(line: 2, utf16index: 0), length: 9, kind: .comment),
+      SemanticToken(start: Position(line: 2, utf16index: 10), length: 6, kind: .comment),
     ])
   }
 
   func testSemanticTokens() {
-    // FIXME: Implement test for semantic tokens (may require awaiting
-    // the corresponding refresh request emitted by updateSemanticTokens
-    // called by handleDocumentUpdate)
+    let text = """
+    struct X {}
 
-    // let text = """
-    // struct X {}
-
-    // let x = X()
-    // let y = x + x
-    // """
-    // let tokens = performSemanticTokensRequest(text: text)
-    // XCTAssertEqual(tokens, [
-    // ])
+    let x = X()
+    let y = x + x
+    """
+    let tokens = performSemanticTokensRequest(text: text)
+    XCTAssertEqual(tokens, [
+      SemanticToken(start: Position(line: 0, utf16index: 0), length: 6, kind: .keyword),
+      SemanticToken(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 2, utf16index: 8), length: 1, kind: .struct),
+      SemanticToken(start: Position(line: 3, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 3, utf16index: 8), length: 1, kind: .variable),
+      SemanticToken(start: Position(line: 3, utf16index: 12), length: 1, kind: .variable),
+    ])
   }
 }
