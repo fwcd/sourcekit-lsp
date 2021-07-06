@@ -219,14 +219,15 @@ struct SemanticTokenParser {
           let start: Position = snapshot.positionOf(utf8Offset: offset),
           let length: Int = response[keys.length],
           let skKind: sourcekitd_uid_t = response[keys.kind],
-          let kind = parseKind(skKind) else {
+          let (kind, modifiers) = parseKindAndModifiers(skKind) else {
       return []
     }
 
     let token = SemanticToken(
       start: start,
       length: length,
-      kind: kind
+      kind: kind,
+      modifiers: modifiers
     )
 
     let children: [SemanticToken]
@@ -248,81 +249,88 @@ struct SemanticTokenParser {
     return result
   }
 
-  private func parseKind(_ uid: sourcekitd_uid_t) -> SemanticToken.Kind? {
+  private func parseKindAndModifiers(_ uid: sourcekitd_uid_t) -> (SemanticToken.Kind, SemanticToken.Modifiers)? {
     let values = sourcekitd.values
     switch uid {
     case values.kind_keyword,
          values.syntaxtype_keyword:
-      return .keyword
+      return (.keyword, [])
     case values.syntaxtype_attribute_builtin:
-      return .modifier
+      return (.modifier, [])
     case values.decl_module:
-      return .namespace
-    case values.decl_class,
-         values.ref_class:
-      return .class
-    case values.decl_struct,
-         values.ref_struct:
-      return .struct
-    case values.decl_enum,
-         values.ref_enum:
-      return .enum
-    case values.decl_protocol,
-         values.ref_protocol:
-      return .interface
+      return (.namespace, [])
+    case values.decl_class:
+      return (.class, [.declaration])
+    case values.ref_class:
+      return (.class, [])
+    case values.decl_struct:
+      return (.struct, [.declaration])
+    case values.ref_struct:
+      return (.struct, [])
+    case values.decl_enum:
+      return (.enum, [.declaration])
+    case values.ref_enum:
+      return (.enum, [])
+    case values.decl_protocol:
+      return (.interface, [.declaration])
+    case values.ref_protocol:
+      return (.interface, [])
     case values.decl_associatedtype,
          values.decl_typealias,
-         values.decl_generic_type_param,
-         values.ref_associatedtype,
+         values.decl_generic_type_param:
+      return (.typeParameter, [.declaration])
+    case values.ref_associatedtype,
          values.ref_typealias,
          values.ref_generic_type_param:
-      return .typeParameter
+      return (.typeParameter, [])
     case values.decl_function_constructor,
          values.decl_function_subscript,
          values.decl_function_free,
          values.decl_function_method_static,
          values.decl_function_method_instance,
-         values.decl_function_method_class,
-         values.ref_function_constructor,
+         values.decl_function_method_class:
+      return (.function, [.declaration])
+    case values.ref_function_constructor,
          values.ref_function_destructor,
          values.ref_function_free,
          values.ref_function_subscript,
          values.ref_function_method_static,
          values.ref_function_method_instance,
          values.ref_function_method_class:
-      return .function
+      return (.function, [])
     case values.decl_function_operator_prefix,
          values.decl_function_operator_postfix,
-         values.decl_function_operator_infix,
-         values.ref_function_operator_prefix,
+         values.decl_function_operator_infix:
+      return (.operator, [.declaration])
+    case values.ref_function_operator_prefix,
          values.ref_function_operator_postfix,
          values.ref_function_operator_infix:
-      return .operator
+      return (.operator, [])
     case values.decl_var_static,
          values.decl_var_class,
-         values.decl_var_instance,
-         values.ref_var_static,
+         values.decl_var_instance:
+      return (.property, [.declaration])
+    case values.ref_var_static,
          values.ref_var_class,
          values.ref_var_instance:
-      return .property
+      return (.property, [])
     case values.decl_var_local,
-         values.decl_var_global,
-         values.ref_var_local,
+         values.decl_var_global:
+      return (.variable, [.declaration])
+    case values.ref_var_local,
          values.ref_var_global:
-      // We don't use values.syntaxtype_identifier here as it would cause
-      // functions to get highlighted as variables too.
-      return .variable
+      return (.variable, [])
     case values.decl_var_parameter:
-      return .parameter
+      return (.parameter, [.declaration])
     case values.syntaxtype_comment,
          values.syntaxtype_doccomment:
-      return .comment
+      return (.comment, [])
     case values.syntaxtype_type_identifier:
-      return .type
+      return (.type, [])
     case values.syntaxtype_number:
-      return .number
+      return (.number, [])
     case values.syntaxtype_string:
-      return .string
+      return (.string, [])
     default:
       return nil
     }
