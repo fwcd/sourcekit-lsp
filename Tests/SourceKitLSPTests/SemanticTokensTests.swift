@@ -161,4 +161,30 @@ final class SemanticTokensTests: XCTestCase {
       SemanticToken(start: Position(line: 9, utf16index: 0), length: 1, kind: .variable),
     ])
   }
+
+  func testSemanticTokensForProtocols() {
+    let text = """
+    protocol X {}
+    class Y: X {}
+
+    let y: Y = X()
+
+    func f<T: X>() {}
+    """
+    let tokens = performSemanticTokensRequest(text: text)
+    XCTAssertEqual(tokens, [
+      // protocol X {}
+      SemanticToken(start: Position(line: 0, utf16index: 0), length: 8, kind: .keyword),
+      // class Y: X {}
+      SemanticToken(start: Position(line: 1, utf16index: 0), length: 5, kind: .keyword),
+      SemanticToken(start: Position(line: 1, utf16index: 9), length: 1, kind: .interface),
+      // let y: Y = X()
+      SemanticToken(start: Position(line: 3, utf16index: 0), length: 3, kind: .keyword),
+      SemanticToken(start: Position(line: 3, utf16index: 7), length: 1, kind: .class),
+      SemanticToken(start: Position(line: 3, utf16index: 11), length: 1, kind: .interface),
+      // func f<T: X>() {}
+      SemanticToken(start: Position(line: 5, utf16index: 0), length: 4, kind: .keyword),
+      SemanticToken(start: Position(line: 5, utf16index: 10), length: 1, kind: .interface),
+    ])
+  }
 }

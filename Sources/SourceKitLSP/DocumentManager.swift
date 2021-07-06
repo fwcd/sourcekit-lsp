@@ -23,7 +23,13 @@ public struct DocumentSnapshot {
   public var semanticTokens: [SemanticToken]
 
   public var text: String { lineTable.content }
-  public var allTokens: [SemanticToken] { syntacticTokens + semanticTokens }
+
+  public var allTokens: [SemanticToken] {
+    // Only pick syntactic tokens for which no semantic token exists
+    let semaRanges = Set(semanticTokens.map(\.range))
+    return syntacticTokens.filter { !semaRanges.contains($0.range) } + semanticTokens
+  }
+  public var sortedTokens: [SemanticToken] { allTokens.sorted { $0.start < $1.start } }
 
   public init(
     document: Document,

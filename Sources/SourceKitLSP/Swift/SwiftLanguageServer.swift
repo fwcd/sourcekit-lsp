@@ -776,7 +776,7 @@ extension SwiftLanguageServer {
         return
       }
 
-      let tokens = snapshot.allTokens.sorted { $0.start < $1.start }
+      let tokens = snapshot.sortedTokens
       let encodedTokens = encodeToIntArray(semanticTokens: tokens)
 
       req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
@@ -799,9 +799,7 @@ extension SwiftLanguageServer {
         return
       }
 
-      let tokens = snapshot.allTokens
-        .filter { $0.range.overlaps(range) }
-        .sorted { $0.start < $1.start }
+      let tokens = snapshot.sortedTokens.filter { $0.range.overlaps(range) }
       let encodedTokens = encodeToIntArray(semanticTokens: tokens)
 
       req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
