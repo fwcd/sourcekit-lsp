@@ -235,4 +235,18 @@ final class SemanticTokensTests: XCTestCase {
       SemanticToken(start: Position(line: 5, utf16index: 10), length: 1, kind: .interface),
     ])
   }
+
+  func testSemanticTokensForFunctionSignatures() {
+    // Function declarations generate a big token that spans
+    // the entire function signature.
+    let text = "func f(x: Int, _ y: String) {}"
+    let tokens = performSemanticTokensRequest(text: text)
+    XCTAssertEqual(tokens, [
+      SemanticToken(start: Position(line: 0, utf16index: 0), length: 4, kind: .keyword),
+      SemanticToken(start: Position(line: 0, utf16index: 5), length: 22, kind: .function, modifiers: .declaration),
+      SemanticToken(start: Position(line: 0, utf16index: 10), length: 3, kind: .struct),
+      SemanticToken(start: Position(line: 0, utf16index: 15), length: 1, kind: .keyword),
+      SemanticToken(start: Position(line: 0, utf16index: 20), length: 6, kind: .struct),
+    ])
+  }
 }

@@ -164,6 +164,7 @@ extension SemanticTokensTests {
       ("testRanged", testRanged),
       ("testSemanticTokens", testSemanticTokens),
       ("testSemanticTokensForProtocols", testSemanticTokensForProtocols),
+      ("testSemanticTokensForFunctionSignatures", testSemanticTokensForFunctionSignatures),
       ("testSyntacticTokens", testSyntacticTokens),
     ]
 }
