@@ -322,18 +322,20 @@ struct SyntaxHighlightingTokenParser {
     case values.decl_function_free:
       return (.function, [.declaration])
     case values.decl_function_method_static,
-         values.decl_function_method_instance,
          values.decl_function_method_class,
-         values.decl_function_constructor,
+         values.decl_function_constructor:
+      return (.method, [.declaration, .static])
+    case values.decl_function_method_instance,
          values.decl_function_destructor,
          values.decl_function_subscript:
       return (.method, [.declaration])
     case values.ref_function_free:
       return (.function, [])
     case values.ref_function_method_static,
-         values.ref_function_method_instance,
          values.ref_function_method_class,
-         values.ref_function_constructor,
+         values.ref_function_constructor:
+      return (.method, [.static])
+    case values.ref_function_method_instance,
          values.ref_function_destructor,
          values.ref_function_subscript:
       return (.method, [])

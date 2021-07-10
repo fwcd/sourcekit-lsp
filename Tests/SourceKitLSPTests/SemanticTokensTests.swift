@@ -276,4 +276,38 @@ final class SemanticTokensTests: XCTestCase {
       SyntaxHighlightingToken(start: Position(line: 0, utf16index: 20), length: 6, kind: .struct),
     ])
   }
+
+  func testSemanticTokensForStaticMethods() {
+    let text = """
+    class X {
+      deinit {}
+      static func f() {}
+      class func g() {}
+    }
+    X.f()
+    X.g()
+    """
+    let tokens = performSemanticTokensRequest(text: text)
+    XCTAssertEqual(tokens, [
+      // class X
+      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 5, kind: .keyword),
+      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 6), length: 1, kind: .class, modifiers: .declaration),
+      // deinit {}
+      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 2), length: 6, kind: .method, modifiers: .declaration),
+      // static func f() {}
+      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 2), length: 6, kind: .keyword),
+      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 9), length: 4, kind: .keyword),
+      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 14), length: 1, kind: .method, modifiers: [.declaration, .static]),
+      // class func g() {}
+      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 2), length: 5, kind: .keyword),
+      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 8), length: 4, kind: .keyword),
+      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 13), length: 1, kind: .method, modifiers: [.declaration, .static]),
+      // X.f()
+      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 0), length: 1, kind: .class),
+      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 2), length: 1, kind: .method, modifiers: [.static]),
+      // X.g()
+      SyntaxHighlightingToken(start: Position(line: 6, utf16index: 0), length: 1, kind: .class),
+      SyntaxHighlightingToken(start: Position(line: 6, utf16index: 2), length: 1, kind: .method, modifiers: [.static]),
+    ])
+  }
 }
