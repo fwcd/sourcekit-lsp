@@ -17,20 +17,22 @@ import SKSupport
 
 public struct DocumentTokens {
   /// Lexical tokens, e.g. keywords, raw identifiers, ...
-  public var lexical: [SemanticToken] = []
+  public var lexical: [SyntaxHighlightingToken] = []
   /// Syntactic tokens, e.g. declarations, etc.
-  public var syntactic: [SemanticToken] = []
+  public var syntactic: [SyntaxHighlightingToken] = []
   /// Semantic tokens, e.g. variable references, type references, ...
-  public var semantic: [SemanticToken] = []
+  public var semantic: [SyntaxHighlightingToken] = []
 
-  public var merged: [SemanticToken] {
-    [lexical, syntactic, semantic].reduce([], mergeSemanticTokens)
+  public var merged: [SyntaxHighlightingToken] {
+    [lexical, syntactic, semantic].reduce([]) { $0.mergingTokens(with: $1) }
   }
-  public var sorted: [SemanticToken] {
+  public var mergedAndSorted: [SyntaxHighlightingToken] {
     merged.sorted { $0.start < $1.start }
   }
 
-  public mutating func withEachKind(_ action: (inout [SemanticToken]) -> Void) {
+  /// Modifies the syntax highlighting tokens of each kind
+  /// (lexical, syntactic, semantic) according to `action`.
+  public mutating func withMutableTokensOfEachKind(_ action: (inout [SyntaxHighlightingToken]) -> Void) {
     action(&lexical)
     action(&syntactic)
     action(&semantic)
@@ -41,6 +43,9 @@ public struct DocumentSnapshot {
   public var document: Document
   public var version: Int
   public var lineTable: LineTable
+  /// Syntax highlighting tokens for the document. Note that
+  /// `uri` + `latestVersion` only uniquely identifies a snapshot's content,
+  /// the tokens are updated independently and only used internally.
   public var tokens: DocumentTokens
 
   public var text: String { lineTable.content }
@@ -173,7 +178,7 @@ public final class DocumentManager {
             character.isWhitespace || character.isPunctuation || character.isSymbol
           }
 
-          func update(tokens: inout [SemanticToken]) {
+          func update(tokens: inout [SyntaxHighlightingToken]) {
             tokens = Array(tokens.lazy
               .filter {
                 // Only keep tokens that don't overlap with or are directly
@@ -197,7 +202,7 @@ public final class DocumentManager {
               })
           }
 
-          document.latestTokens.withEachKind(update(tokens:))
+          document.latestTokens.withMutableTokensOfEachKind(update(tokens:))
         } else {
           // Full text replacement.
           document.latestLineTable = LineTable(edit.text)
@@ -218,7 +223,7 @@ public final class DocumentManager {
   @discardableResult
   public func replaceSemanticTokens(
     _ uri: DocumentURI,
-    tokens: [SemanticToken]
+    tokens: [SyntaxHighlightingToken]
   ) throws -> DocumentSnapshot {
     return try queue.sync {
       guard let document = documents[uri] else {
@@ -237,7 +242,7 @@ public final class DocumentManager {
   @discardableResult
   public func replaceSyntacticTokens(
     _ uri: DocumentURI,
-    tokens: [SemanticToken]
+    tokens: [SyntaxHighlightingToken]
   ) throws -> DocumentSnapshot {
     return try queue.sync {
       guard let document = documents[uri] else {
@@ -256,24 +261,25 @@ public final class DocumentManager {
   @discardableResult
   public func addLexicalTokens(
     _ uri: DocumentURI,
-    tokens: [SemanticToken]
+    tokens newTokens: [SyntaxHighlightingToken]
   ) throws -> DocumentSnapshot {
     return try queue.sync {
       guard let document = documents[uri] else {
         throw Error.missingDocument(uri)
       }
 
-      if !tokens.isEmpty {
-        // Remove all tokens that overlap with previous tokens
+      if !newTokens.isEmpty {
+        // Remove all tokens from `documentTokens.latestTokens.lexical`
+        // that overlap with a token in `tokens`.
 
-        func removeAllOverlapping(tokens existingTokens: inout [SemanticToken]) {
+        func removeAllOverlapping(tokens existingTokens: inout [SyntaxHighlightingToken]) {
           existingTokens.removeAll { existing in
-            tokens.contains { existing.range.overlaps($0.range) }
+            newTokens.contains { existing.range.overlaps($0.range) }
           }
         }
 
-        document.latestTokens.withEachKind(removeAllOverlapping(tokens:))
-        document.latestTokens.lexical += tokens
+        document.latestTokens.withMutableTokensOfEachKind(removeAllOverlapping(tokens:))
+        document.latestTokens.lexical += newTokens
       }
 
       return document.latestSnapshot

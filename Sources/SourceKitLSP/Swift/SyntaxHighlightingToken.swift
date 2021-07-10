@@ -14,8 +14,10 @@ import SourceKitD
 import LanguageServerProtocol
 import LSPLogging
 
-/// A ranged token in the document used for semantic syntax highlighting.
-public struct SemanticToken: Hashable {
+/// A ranged token in the document used for syntax highlighting.
+/// Note that tokens are always on a single line, i.e. multi-line
+/// tokens are not allowed.
+public struct SyntaxHighlightingToken: Hashable {
   public var start: Position
   public var length: Int
   public var kind: Kind
@@ -42,59 +44,72 @@ public struct SemanticToken: Hashable {
   }
 
   /// The token type. Represented using an int to make the conversion to
-  /// LSP tokens efficient.
+  /// LSP tokens efficient. The order of this enum does not have to be
+  /// stable, since we provide a `SemanticTokensLegend` during initialization.
+  /// It is, however, important that the values are numbered from 0 due to
+  /// the way the kinds are encoded in LSP.
+  /// Also note that we intentionally use an enum here instead of e.g. a
+  /// `RawRepresentable` struct, since we want to have a conversion to
+  /// strings for known kinds and since these kinds are only provided by the
+  /// server, i.e. there is no need to handle cases where unknown kinds
+  /// have to be decoded.
   public enum Kind: UInt32, CaseIterable, Hashable {
-    case comment = 0
+    case namespace = 0
+    case type
+    case `class`
+    case `enum`
+    case interface
+    case `struct`
+    case typeParameter
+    case parameter
+    case variable
+    case property
+    case enumMember
+    case event
+    case function
+    case method
+    case macro
     case keyword
     case modifier
+    case comment
+    case string
+    case number
     case regexp
     case `operator`
-    case namespace
-    case type
-    case `struct`
-    case `class`
-    case interface
-    case `enum`
-    case typeParameter
-    case function
-    case macro
-    case method
-    case variable
-    case parameter
-    case property
-    case label
-    case number
-    case string
 
     /// The name of the token type used by LSP.
     var lspName: String {
       switch self {
-      case .comment: return "comment"
-      case .keyword: return "keyword"
-      case .modifier: return "modifier"
-      case .regexp: return "regexp"
-      case .operator: return "operator"
       case .namespace: return "namespace"
       case .type: return "type"
-      case .struct: return "struct"
       case .class: return "class"
-      case .interface: return "interface"
       case .enum: return "enum"
+      case .interface: return "interface"
+      case .struct: return "struct"
       case .typeParameter: return "typeParameter"
-      case .function: return "function"
-      case .macro: return "macro"
-      case .method: return "method"
-      case .variable: return "variable"
       case .parameter: return "parameter"
+      case .variable: return "variable"
       case .property: return "property"
-      case .label: return "label"
-      case .number: return "number"
+      case .enumMember: return "enumMember"
+      case .event: return "event"
+      case .function: return "function"
+      case .method: return "method"
+      case .macro: return "macro"
+      case .keyword: return "keyword"
+      case .modifier: return "modifier"
+      case .comment: return "comment"
       case .string: return "string"
+      case .number: return "number"
+      case .regexp: return "regexp"
+      case .operator: return "operator"
       }
     }
   }
 
-  /// Additional metadata about a token.
+  /// Additional metadata about a token. Similar to `Kind`, the raw
+  /// values do not actually have to be stable, do note however that
+  /// the bit indices should be numbered starting at 0 and that
+  /// the ordering should correspond to `allCases`.
   public struct Modifiers: OptionSet, CaseIterable, Hashable {
     public static let declaration = Self(rawValue: 1 << 0)
     public static let definition = Self(rawValue: 1 << 1)
@@ -107,7 +122,8 @@ public struct SemanticToken: Hashable {
     public static let documentation = Self(rawValue: 1 << 8)
     public static let defaultLibrary = Self(rawValue: 1 << 9)
 
-    /// All available modifiers, in order
+    /// All available modifiers, in ascending order of the bit index
+    /// they are represented with (starting at the rightmost bit).
     public static let allCases: [Self] = [
       .declaration,
       .definition,
@@ -123,11 +139,14 @@ public struct SemanticToken: Hashable {
 
     public let rawValue: UInt32
 
-    /// The name of the modifier used by LSP.
+    /// The name of the modifier used by LSP, if this
+    /// is a single modifier. Note that every modifier
+    /// in `allCases` must have an associated `lspName`.
     public var lspName: String? {
       switch self {
       case .declaration: return "declaration"
       case .definition: return "definition"
+      case .readonly: return "readonly"
       case .static: return "static"
       case .deprecated: return "deprecated"
       case .abstract: return "abstract"
@@ -145,95 +164,63 @@ public struct SemanticToken: Hashable {
   }
 }
 
-/// Encodes to the LSP representation of semantic tokens.
-public func encodeToIntArray(semanticTokens tokens: [SemanticToken]) -> [UInt32] {
-  var current = Position(line: 0, utf16index: 0)
-  var rawTokens: [UInt32] = []
-  rawTokens.reserveCapacity(tokens.count * 5)
+extension Array where Element == SyntaxHighlightingToken {
+  /// The LSP representation of syntax highlighting tokens. Note that this
+  /// requires the tokens in this array to be sorted.
+  public var lspEncoded: [UInt32] {
+    var previous = Position(line: 0, utf16index: 0)
+    var rawTokens: [UInt32] = []
+    rawTokens.reserveCapacity(count * 5)
 
-  for token in tokens {
-    let previous = Position(
-      line: current.line,
-      utf16index: current.line == token.start.line ? current.utf16index : 0
-    )
-    current = token.start
-    rawTokens += [
-      UInt32(token.start.line - previous.line),
-      UInt32(token.start.utf16index - previous.utf16index),
-      UInt32(token.length),
-      token.kind.rawValue,
-      token.modifiers.rawValue
-    ]
-  }
-
-  return rawTokens
-}
-
-/// Decodes the LSP representation of semantic tokens
-public func decodeFromIntArray(rawSemanticTokens rawTokens: [UInt32]) -> [SemanticToken] {
-  var current = Position(line: 0, utf16index: 0)
-  var tokens: [SemanticToken] = []
-  tokens.reserveCapacity(rawTokens.count / 5)
-
-  for i in stride(from: 0, to: rawTokens.count, by: 5) {
-    let lineDelta = Int(rawTokens[i])
-    let charDelta = Int(rawTokens[i + 1])
-    let length = Int(rawTokens[i + 2])
-    let rawKind = rawTokens[i + 3]
-    let rawModifiers = rawTokens[i + 4]
-
-    guard let kind = SemanticToken.Kind(rawValue: rawKind) else { continue }
-    let modifiers = SemanticToken.Modifiers(rawValue: rawModifiers)
-
-    current.line += lineDelta
-
-    if lineDelta == 0 {
-      current.utf16index += charDelta
-    } else {
-      current.utf16index = charDelta
+    for token in self {
+      let lineDelta = token.start.line - previous.line
+      let charDelta = token.start.utf16index - (
+        // The character delta is relative to the previous token's start
+        // only if the token is on the previous token's line.
+        previous.line == token.start.line ? previous.utf16index : 0
+      )
+      previous = token.start
+      rawTokens += [
+        UInt32(lineDelta),
+        UInt32(charDelta),
+        UInt32(token.length),
+        token.kind.rawValue,
+        token.modifiers.rawValue
+      ]
     }
 
-    tokens.append(SemanticToken(
-      start: current,
-      length: length,
-      kind: kind,
-      modifiers: modifiers
-    ))
+    return rawTokens
   }
 
-  return tokens
+  /// Merges the tokens in this array into a new token array,
+  /// preferring the given array's tokens if duplicate ranges are
+  /// found.
+  public func mergingTokens(with other: [SyntaxHighlightingToken]) -> [SyntaxHighlightingToken] {
+    let otherRanges = Set(other.map(\.range))
+    return filter { !otherRanges.contains($0.range) } + other
+  }
 }
 
-/// Merges the given token arrays into a new token array,
-/// preferring the second array's tokens if duplicate ranges are
-/// found.
-public func mergeSemanticTokens(_ lhs: [SemanticToken], _ rhs: [SemanticToken]) -> [SemanticToken] {
-  let rhsRanges = Set(rhs.map(\.range))
-  return lhs.filter { !rhsRanges.contains($0.range) } + rhs
-}
-
-/// Parses semantic tokens from sourcekitd response dictionaries.
-struct SemanticTokenParser {
+/// Parses tokens from sourcekitd response dictionaries.
+struct SyntaxHighlightingTokenParser {
   private let sourcekitd: SourceKitD
-  private let snapshot: DocumentSnapshot
   private let useName: Bool
 
-  init(sourcekitd: SourceKitD, snapshot: DocumentSnapshot, useName: Bool = false) {
+  init(sourcekitd: SourceKitD, useName: Bool = false) {
     self.sourcekitd = sourcekitd
-    self.snapshot = snapshot
     self.useName = useName
   }
 
-  func parseTokens(_ response: SKDResponseDictionary) -> [SemanticToken] {
+  func parseTokens(_ response: SKDResponseDictionary, in snapshot: DocumentSnapshot) -> [SyntaxHighlightingToken] {
     let keys = sourcekitd.keys
-    var tokens: [SemanticToken] = []
+    var tokens: [SyntaxHighlightingToken] = []
 
     if let offset: Int = useName ? response[keys.nameoffset] : response[keys.offset],
        let length: Int = useName ? response[keys.namelength] : response[keys.length],
        let start: Position = snapshot.positionOf(utf8Offset: offset),
        let skKind: sourcekitd_uid_t = response[keys.kind],
        let (kind, modifiers) = parseKindAndModifiers(skKind) {
-      let token = SemanticToken(
+      let token = SyntaxHighlightingToken(
         start: start,
         length: length,
         kind: kind,
@@ -243,22 +230,23 @@ struct SemanticTokenParser {
     }
 
     if let substructure: SKDResponseArray = response[keys.substructure] {
-      tokens += parseTokens(substructure)
+      tokens += parseTokens(substructure, in: snapshot)
     }
 
     return tokens
   }
 
-  func parseTokens(_ response: SKDResponseArray) -> [SemanticToken] {
-    var result: [SemanticToken] = []
+  func parseTokens(_ response: SKDResponseArray, in snapshot: DocumentSnapshot) -> [SyntaxHighlightingToken] {
+    var result: [SyntaxHighlightingToken] = []
     response.forEach { (_, value) in
-      result += parseTokens(value)
+      result += parseTokens(value, in: snapshot)
       return true
     }
     return result
   }
 
-  private func parseKindAndModifiers(_ uid: sourcekitd_uid_t) -> (SemanticToken.Kind, SemanticToken.Modifiers)? {
+  private func parseKindAndModifiers(_ uid: sourcekitd_uid_t) -> (SyntaxHighlightingToken.Kind, SyntaxHighlightingToken.Modifiers)? {
+    let api = sourcekitd.api
     let values = sourcekitd.values
     switch uid {
     case values.kind_keyword,
@@ -292,22 +280,23 @@ struct SemanticTokenParser {
          values.ref_typealias,
          values.ref_generic_type_param:
       return (.typeParameter, [])
-    case values.decl_function_constructor,
-         values.decl_function_subscript,
-         values.decl_function_free:
+    case values.decl_function_free:
       return (.function, [.declaration])
     case values.decl_function_method_static,
          values.decl_function_method_instance,
-         values.decl_function_method_class:
+         values.decl_function_method_class,
+         values.decl_function_constructor,
+         values.decl_function_destructor,
+         values.decl_function_subscript:
       return (.method, [.declaration])
-    case values.ref_function_constructor,
-         values.ref_function_destructor,
-         values.ref_function_free,
-         values.ref_function_subscript:
+    case values.ref_function_free:
       return (.function, [])
     case values.ref_function_method_static,
          values.ref_function_method_instance,
-         values.ref_function_method_class:
+         values.ref_function_method_class,
+         values.ref_function_constructor,
+         values.ref_function_destructor,
+         values.ref_function_subscript:
       return (.method, [])
     case values.decl_function_operator_prefix,
          values.decl_function_operator_postfix,
@@ -346,6 +335,8 @@ struct SemanticTokenParser {
     case values.syntaxtype_string:
       return (.string, [])
     default:
+      let name = api.uid_get_string_ptr(uid).map(String.init(cString:))
+      log("Unknown token kind: \(name ?? "?")", level: .warning)
       return nil
     }
   }

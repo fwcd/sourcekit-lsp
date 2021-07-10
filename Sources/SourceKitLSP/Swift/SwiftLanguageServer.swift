@@ -162,18 +162,18 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
   }
 
   /// Update lexical and syntactic tokens for the given `snapshot`.
-  func updateLexicalAndSyntacticTokens(
+  /// Should only be called on `queue`.
+  private func updateLexicalAndSyntacticTokens(
     response: SKDResponseDictionary,
     for snapshot: DocumentSnapshot
   ) {
+    dispatchPrecondition(condition: .onQueue(queue))
+
     let uri = snapshot.document.uri
 
     if let syntaxMap: SKDResponseArray = response[keys.syntaxmap] {
-      let tokenParser = SemanticTokenParser(
-        sourcekitd: sourcekitd,
-        snapshot: snapshot
-      )
-      let tokens = tokenParser.parseTokens(syntaxMap)
+      let tokenParser = SyntaxHighlightingTokenParser(sourcekitd: sourcekitd)
+      let tokens = tokenParser.parseTokens(syntaxMap, in: snapshot)
       do {
         try documentManager.addLexicalTokens(uri, tokens: tokens)
       } catch {
@@ -182,47 +182,48 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
     }
 
     if let substructure: SKDResponseArray = response[keys.substructure] {
-      let tokenParser = SemanticTokenParser(
-        sourcekitd: sourcekitd,
-        snapshot: snapshot,
-        useName: true
-      )
-      let tokens = tokenParser.parseTokens(substructure)
+      let tokenParser = SyntaxHighlightingTokenParser(sourcekitd: sourcekitd, useName: true)
+      let tokens = tokenParser.parseTokens(substructure, in: snapshot)
       do {
         try documentManager.replaceSyntacticTokens(uri, tokens: tokens)
       } catch {
-        log("updating lexical tokens for \(uri) failed: \(error)", level: .warning)
+        log("updating syntactic tokens for \(uri) failed: \(error)", level: .warning)
       }
     }
   }
 
   /// Update semantic tokens for the given `snapshot`.
-  func updateSemanticTokens(
+  /// Should only be called on `queue`.
+  private func updateSemanticTokens(
     response: SKDResponseDictionary,
     for snapshot: DocumentSnapshot
   ) {
+    dispatchPrecondition(condition: .onQueue(queue))
+
     let uri = snapshot.document.uri
     guard let skTokens: SKDResponseArray = response[keys.annotations] else {
       return
     }
 
-    let tokenParser = SemanticTokenParser(
-      sourcekitd: sourcekitd,
-      snapshot: snapshot
-    )
-    let tokens = tokenParser.parseTokens(skTokens)
+    let tokenParser = SyntaxHighlightingTokenParser(sourcekitd: sourcekitd)
+    let tokens = tokenParser.parseTokens(skTokens, in: snapshot)
 
     do {
       try documentManager.replaceSemanticTokens(uri, tokens: tokens)
-      if clientCapabilities.workspace?.semanticTokens?.refreshSupport ?? false {
-        _ = client.send(WorkspaceSemanticTokensRefreshRequest(), queue: queue) { result in
-          if let error = result.failure {
-            log("refreshing semantic tokens for \(uri) failed: \(error)", level: .warning)
-          }
-        }
-      }
+      
     } catch {
       log("updating semantic tokens for \(uri) failed: \(error)", level: .warning)
+    }
+  }
+
+  /// Inform the client about changes to the syntax highlighting tokens.
+  private func requestTokensRefresh() {
+    if clientCapabilities.workspace?.semanticTokens?.refreshSupport ?? false {
+      _ = client.send(WorkspaceSemanticTokensRefreshRequest(), queue: queue) { result in
+        if let error = result.failure {
+          log("refreshing tokens failed: \(error)", level: .warning)
+        }
+      }
     }
   }
 
@@ -288,6 +289,7 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
     if let dict = try? self.sourcekitd.sendSync(req) {
       publishDiagnostics(response: dict, for: snapshot, compileCommand: compileCommand)
       updateSemanticTokens(response: dict, for: snapshot)
+      requestTokensRefresh()
     }
   }
 }
@@ -323,8 +325,8 @@ extension SwiftLanguageServer {
         commands: builtinSwiftCommands),
       semanticTokensProvider: SemanticTokensOptions(
         legend: SemanticTokensLegend(
-          tokenTypes: SemanticToken.Kind.allCases.map(\.lspName),
-          tokenModifiers: SemanticToken.Modifiers.allCases.compactMap(\.lspName)),
+          tokenTypes: SyntaxHighlightingToken.Kind.allCases.map(\.lspName),
+          tokenModifiers: SyntaxHighlightingToken.Modifiers.allCases.map { $0.lspName! }),
         range: .bool(true),
         full: .bool(true))
     ))
@@ -788,8 +790,8 @@ extension SwiftLanguageServer {
         return
       }
 
-      let tokens = snapshot.tokens.sorted
-      let encodedTokens = encodeToIntArray(semanticTokens: tokens)
+      let tokens = snapshot.tokens.mergedAndSorted
+      let encodedTokens = tokens.lspEncoded
 
       req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
     }
@@ -811,8 +813,8 @@ extension SwiftLanguageServer {
         return
       }
 
-      let tokens = snapshot.tokens.sorted.filter { $0.range.overlaps(range) }
-      let encodedTokens = encodeToIntArray(semanticTokens: tokens)
+      let tokens = snapshot.tokens.mergedAndSorted.filter { $0.range.overlaps(range) }
+      let encodedTokens = tokens.lspEncoded
 
       req.reply(DocumentSemanticTokensResponse(data: encodedTokens))
     }
