@@ -16,6 +16,8 @@ import SKTestSupport
 import SourceKitLSP
 import XCTest
 
+private typealias Token = SyntaxHighlightingToken
+
 final class SemanticTokensTests: XCTestCase {
   /// Connection and lifetime management for the service.
   var connection: TestSourceKitServer! = nil
@@ -49,7 +51,7 @@ final class SemanticTokensTests: XCTestCase {
     ))
   }
 
-  private func performSemanticTokensRequest(text: String, range: Range<Position>? = nil) -> [SyntaxHighlightingToken] {
+  private func performSemanticTokensRequest(text: String, range: Range<Position>? = nil) -> [Token] {
     let url = URL(fileURLWithPath: "/\(#function)/a.swift")
 
     // We wait for the first refresh request to make sure that the semantic tokens are ready
@@ -78,17 +80,17 @@ final class SemanticTokensTests: XCTestCase {
       response = try! sk.sendSync(DocumentSemanticTokensRequest(textDocument: textDocument))
     }
 
-    return [SyntaxHighlightingToken](lspEncodedTokens: response.data)
+    return [Token](lspEncodedTokens: response.data)
   }
 
   func testIntArrayCoding() {
     let tokens = [
-      SyntaxHighlightingToken(
+      Token(
         start: Position(line: 2, utf16index: 3),
         length: 5,
         kind: .string
       ),
-      SyntaxHighlightingToken(
+      Token(
         start: Position(line: 4, utf16index: 2),
         length: 1,
         kind: .interface,
@@ -101,17 +103,17 @@ final class SemanticTokensTests: XCTestCase {
       2, // line delta
       3, // char delta
       5, // length
-      SyntaxHighlightingToken.Kind.string.rawValue, // kind
+      Token.Kind.string.rawValue, // kind
       0, // modifiers
 
       2, // line delta
       2, // char delta
       1, // length
-      SyntaxHighlightingToken.Kind.interface.rawValue, // kind
-      SyntaxHighlightingToken.Modifiers.deprecated.rawValue | SyntaxHighlightingToken.Modifiers.definition.rawValue, // modifiers
+      Token.Kind.interface.rawValue, // kind
+      Token.Modifiers.deprecated.rawValue | Token.Modifiers.definition.rawValue, // modifiers
     ])
 
-    let decoded = [SyntaxHighlightingToken](lspEncodedTokens: encoded)
+    let decoded = [Token](lspEncodedTokens: encoded)
     XCTAssertEqual(decoded, tokens)
   }
 
@@ -132,11 +134,11 @@ final class SemanticTokensTests: XCTestCase {
     let end = Position(line: 2, utf16index: 5)
     let tokens = performSemanticTokensRequest(text: text, range: start..<end)
     XCTAssertEqual(tokens, [
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 4), length: 4, kind: .variable, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 11), length: 2, kind: .number),
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 4), length: 3, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 1, utf16index: 4), length: 4, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 1, utf16index: 11), length: 2, kind: .number),
+      Token(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 2, utf16index: 4), length: 3, kind: .variable, modifiers: .declaration),
     ])
   }
 
@@ -149,16 +151,16 @@ final class SemanticTokensTests: XCTestCase {
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
       // let x = 3
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 8), length: 1, kind: .number),
+      Token(start: Position(line: 0, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 0, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 0, utf16index: 8), length: 1, kind: .number),
       // var y = "test"
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 8), length: 6, kind: .string),
+      Token(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 1, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 1, utf16index: 8), length: 6, kind: .string),
       // /* abc */ // 123
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 0), length: 9, kind: .comment),
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 10), length: 6, kind: .comment),
+      Token(start: Position(line: 2, utf16index: 0), length: 9, kind: .comment),
+      Token(start: Position(line: 2, utf16index: 10), length: 6, kind: .comment),
     ])
   }
 
@@ -170,13 +172,13 @@ final class SemanticTokensTests: XCTestCase {
     """
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 8), length: 1, kind: .number),
+      Token(start: Position(line: 0, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 0, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 0, utf16index: 8), length: 1, kind: .number),
       // Multi-line comments are split into single-line tokens
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 10), length: 2, kind: .comment),
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 0), length: 10, kind: .comment),
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 0), length: 2, kind: .comment),
+      Token(start: Position(line: 0, utf16index: 10), length: 2, kind: .comment),
+      Token(start: Position(line: 1, utf16index: 0), length: 10, kind: .comment),
+      Token(start: Position(line: 2, utf16index: 0), length: 2, kind: .comment),
     ])
   }
 
@@ -187,8 +189,8 @@ final class SemanticTokensTests: XCTestCase {
     """
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 10, kind: .comment),
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 2), length: 7, kind: .comment),
+      Token(start: Position(line: 0, utf16index: 0), length: 10, kind: .comment),
+      Token(start: Position(line: 1, utf16index: 2), length: 7, kind: .comment),
     ])
   }
 
@@ -208,27 +210,27 @@ final class SemanticTokensTests: XCTestCase {
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
       // struct X {}
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 6, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 7), length: 1, kind: .struct, modifiers: .declaration),
+      Token(start: Position(line: 0, utf16index: 0), length: 6, kind: .keyword),
+      Token(start: Position(line: 0, utf16index: 7), length: 1, kind: .struct, modifiers: .declaration),
       // let x = X()
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 8), length: 1, kind: .struct),
+      Token(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 2, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 2, utf16index: 8), length: 1, kind: .struct),
       // let y = x + x
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 8), length: 1, kind: .variable),
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 12), length: 1, kind: .variable),
+      Token(start: Position(line: 3, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 3, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 3, utf16index: 8), length: 1, kind: .variable),
+      Token(start: Position(line: 3, utf16index: 12), length: 1, kind: .variable),
       // func a() {}
-      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 0), length: 4, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 5), length: 1, kind: .function, modifiers: .declaration),
+      Token(start: Position(line: 5, utf16index: 0), length: 4, kind: .keyword),
+      Token(start: Position(line: 5, utf16index: 5), length: 1, kind: .function, modifiers: .declaration),
       // let b = {}
-      SyntaxHighlightingToken(start: Position(line: 6, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 6, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 6, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 6, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
       // a()
-      SyntaxHighlightingToken(start: Position(line: 8, utf16index: 0), length: 1, kind: .function),
+      Token(start: Position(line: 8, utf16index: 0), length: 1, kind: .function),
       // b()
-      SyntaxHighlightingToken(start: Position(line: 9, utf16index: 0), length: 1, kind: .variable),
+      Token(start: Position(line: 9, utf16index: 0), length: 1, kind: .variable),
     ])
   }
 
@@ -244,22 +246,22 @@ final class SemanticTokensTests: XCTestCase {
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
       // protocol X {}
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 8, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 9), length: 1, kind: .interface, modifiers: .declaration),
+      Token(start: Position(line: 0, utf16index: 0), length: 8, kind: .keyword),
+      Token(start: Position(line: 0, utf16index: 9), length: 1, kind: .interface, modifiers: .declaration),
       // class Y: X {}
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 0), length: 5, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 6), length: 1, kind: .class, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 9), length: 1, kind: .interface),
+      Token(start: Position(line: 1, utf16index: 0), length: 5, kind: .keyword),
+      Token(start: Position(line: 1, utf16index: 6), length: 1, kind: .class, modifiers: .declaration),
+      Token(start: Position(line: 1, utf16index: 9), length: 1, kind: .interface),
       // let y: Y = X()
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 7), length: 1, kind: .class),
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 11), length: 1, kind: .interface),
+      Token(start: Position(line: 3, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 3, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 3, utf16index: 7), length: 1, kind: .class),
+      Token(start: Position(line: 3, utf16index: 11), length: 1, kind: .interface),
       // func f<T: X>() {}
-      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 0), length: 4, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 5), length: 1, kind: .function, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 7), length: 1, kind: .typeParameter, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 10), length: 1, kind: .interface),
+      Token(start: Position(line: 5, utf16index: 0), length: 4, kind: .keyword),
+      Token(start: Position(line: 5, utf16index: 5), length: 1, kind: .function, modifiers: .declaration),
+      Token(start: Position(line: 5, utf16index: 7), length: 1, kind: .typeParameter, modifiers: .declaration),
+      Token(start: Position(line: 5, utf16index: 10), length: 1, kind: .interface),
     ])
   }
 
@@ -267,13 +269,13 @@ final class SemanticTokensTests: XCTestCase {
     let text = "func f(x: Int, _ y: String) {}"
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 4, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 5), length: 1, kind: .function, modifiers: .declaration),
+      Token(start: Position(line: 0, utf16index: 0), length: 4, kind: .keyword),
+      Token(start: Position(line: 0, utf16index: 5), length: 1, kind: .function, modifiers: .declaration),
       // Parameter labels use .function as a kind, see parseKindAndModifiers for rationale
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 7), length: 1, kind: .function, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 10), length: 3, kind: .struct),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 15), length: 1, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 20), length: 6, kind: .struct),
+      Token(start: Position(line: 0, utf16index: 7), length: 1, kind: .function, modifiers: .declaration),
+      Token(start: Position(line: 0, utf16index: 10), length: 3, kind: .struct),
+      Token(start: Position(line: 0, utf16index: 15), length: 1, kind: .keyword),
+      Token(start: Position(line: 0, utf16index: 20), length: 6, kind: .struct),
     ])
   }
 
@@ -290,24 +292,24 @@ final class SemanticTokensTests: XCTestCase {
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
       // class X
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 5, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 6), length: 1, kind: .class, modifiers: .declaration),
+      Token(start: Position(line: 0, utf16index: 0), length: 5, kind: .keyword),
+      Token(start: Position(line: 0, utf16index: 6), length: 1, kind: .class, modifiers: .declaration),
       // deinit {}
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 2), length: 6, kind: .method, modifiers: .declaration),
+      Token(start: Position(line: 1, utf16index: 2), length: 6, kind: .method, modifiers: .declaration),
       // static func f() {}
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 2), length: 6, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 9), length: 4, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 14), length: 1, kind: .method, modifiers: [.declaration, .static]),
+      Token(start: Position(line: 2, utf16index: 2), length: 6, kind: .keyword),
+      Token(start: Position(line: 2, utf16index: 9), length: 4, kind: .keyword),
+      Token(start: Position(line: 2, utf16index: 14), length: 1, kind: .method, modifiers: [.declaration, .static]),
       // class func g() {}
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 2), length: 5, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 8), length: 4, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 3, utf16index: 13), length: 1, kind: .method, modifiers: [.declaration, .static]),
+      Token(start: Position(line: 3, utf16index: 2), length: 5, kind: .keyword),
+      Token(start: Position(line: 3, utf16index: 8), length: 4, kind: .keyword),
+      Token(start: Position(line: 3, utf16index: 13), length: 1, kind: .method, modifiers: [.declaration, .static]),
       // X.f()
-      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 0), length: 1, kind: .class),
-      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 2), length: 1, kind: .method, modifiers: [.static]),
+      Token(start: Position(line: 5, utf16index: 0), length: 1, kind: .class),
+      Token(start: Position(line: 5, utf16index: 2), length: 1, kind: .method, modifiers: [.static]),
       // X.g()
-      SyntaxHighlightingToken(start: Position(line: 6, utf16index: 0), length: 1, kind: .class),
-      SyntaxHighlightingToken(start: Position(line: 6, utf16index: 2), length: 1, kind: .method, modifiers: [.static]),
+      Token(start: Position(line: 6, utf16index: 0), length: 1, kind: .class),
+      Token(start: Position(line: 6, utf16index: 2), length: 1, kind: .method, modifiers: [.static]),
     ])
   }
 }
