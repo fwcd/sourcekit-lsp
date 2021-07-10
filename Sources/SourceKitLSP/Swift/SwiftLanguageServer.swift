@@ -174,8 +174,19 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
     if let syntaxMap: SKDResponseArray = response[keys.syntaxmap] {
       let tokenParser = SyntaxHighlightingTokenParser(sourcekitd: sourcekitd)
       let tokens = tokenParser.parseTokens(syntaxMap, in: snapshot)
+      let range: Range<Position>?
+
+      if let offset: Int = response[keys.offset],
+         let length: Int = response[keys.length],
+         let start: Position = snapshot.positionOf(utf8Offset: offset),
+         let end: Position = snapshot.positionOf(utf8Offset: offset + length) {
+        range = start..<end
+      } else {
+        range = nil
+      }
+
       do {
-        try documentManager.addLexicalTokens(uri, tokens: tokens)
+        try documentManager.replaceLexicalTokens(uri, in: range, with: tokens)
       } catch {
         log("updating lexical tokens for \(uri) failed: \(error)", level: .warning)
       }
@@ -474,36 +485,52 @@ extension SwiftLanguageServer {
     let keys = self.keys
 
     self.queue.async {
+      let uri = note.textDocument.uri
+      let newVersion = note.textDocument.version ?? -1
       var lastResponse: SKDResponseDictionary? = nil
 
-      let snapshot = self.documentManager.edit(note) { (before: DocumentSnapshot, edit: TextDocumentContentChangeEvent) in
-        let req = SKDRequestDictionary(sourcekitd: self.sourcekitd)
-        req[keys.request] = self.requests.editor_replacetext
-        req[keys.name] = note.textDocument.uri.pseudoPath
+      // We iterate manually over the `contentChanges` here instead of passing
+      // the notification directly to the convenience method `edit(_:editCallback:)`
+      // since we need to update the tokens in lockstep with the edits in the
+      // document.
 
-        if let range = edit.range {
-          guard let offset = before.utf8Offset(of: range.lowerBound), let end = before.utf8Offset(of: range.upperBound) else {
-            fatalError("invalid edit \(range)")
+      do {
+        for edit in note.contentChanges {
+          try self.documentManager.edit(uri, newVersion: newVersion, edits: [edit]) { (before: DocumentSnapshot, edit: TextDocumentContentChangeEvent) in
+            let req = SKDRequestDictionary(sourcekitd: self.sourcekitd)
+            req[keys.request] = self.requests.editor_replacetext
+            req[keys.name] = note.textDocument.uri.pseudoPath
+
+            if let range = edit.range {
+              guard let offset = before.utf8Offset(of: range.lowerBound), let end = before.utf8Offset(of: range.upperBound) else {
+                fatalError("invalid edit \(range)")
+              }
+
+              req[keys.offset] = offset
+              req[keys.length] = end - offset
+
+            } else {
+              // Full text
+              req[keys.offset] = 0
+              req[keys.length] = before.text.utf8.count
+            }
+
+            req[keys.sourcetext] = edit.text
+
+            lastResponse = try? self.sourcekitd.sendSync(req)
           }
 
-          req[keys.offset] = offset
-          req[keys.length] = end - offset
-
-        } else {
-          // Full text
-          req[keys.offset] = 0
-          req[keys.length] = before.text.utf8.count
+          if let dict = lastResponse, let snapshot = self.documentManager.latestSnapshot(uri) {
+            self.updateLexicalAndSyntacticTokens(response: dict, for: snapshot)
+          }
         }
-
-        req[keys.sourcetext] = edit.text
-
-        lastResponse = try? self.sourcekitd.sendSync(req)
+      } catch {
+        log("failed to edit document: \(error)", level: .error)
       }
 
-      if let dict = lastResponse, let snapshot = snapshot {
+      if let dict = lastResponse, let snapshot = self.documentManager.latestSnapshot(uri) {
         let compileCommand = self.commandsByFile[note.textDocument.uri]
         self.publishDiagnostics(response: dict, for: snapshot, compileCommand: compileCommand)
-        self.updateLexicalAndSyntacticTokens(response: dict, for: snapshot)
       }
     }
   }

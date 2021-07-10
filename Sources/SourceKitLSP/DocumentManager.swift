@@ -254,14 +254,17 @@ public final class DocumentManager {
     }
   }
 
-  /// Adds the given lexical tokens to a document.
+  /// Replaces the given lexical tokens in a document
+  /// within the given range.
   ///
   /// - parameter uri: The URI of the document to be updated
+  /// - parameter range: The range to replace tokens in (nil means the entire document)
   /// - parameter tokens: The tokens to be added
   @discardableResult
-  public func addLexicalTokens(
+  public func replaceLexicalTokens(
     _ uri: DocumentURI,
-    tokens newTokens: [SyntaxHighlightingToken]
+    in range: Range<Position>? = nil,
+    with newTokens: [SyntaxHighlightingToken]
   ) throws -> DocumentSnapshot {
     return try queue.sync {
       guard let document = documents[uri] else {
@@ -269,16 +272,13 @@ public final class DocumentManager {
       }
 
       if !newTokens.isEmpty {
-        // Remove all tokens from `documentTokens.latestTokens.lexical`
-        // that overlap with a token in `tokens`.
-
-        func removeAllOverlapping(tokens existingTokens: inout [SyntaxHighlightingToken]) {
-          existingTokens.removeAll { existing in
-            newTokens.contains { existing.sameLineRange.overlaps($0.sameLineRange) }
+        if let range = range {
+          document.latestTokens.lexical.removeAll {
+            // Remove overlapping or bounding tokens
+            $0.start <= range.upperBound && range.lowerBound <= $0.sameLineEnd
           }
         }
 
-        document.latestTokens.withMutableTokensOfEachKind(removeAllOverlapping(tokens:))
         document.latestTokens.lexical += newTokens
       }
 
