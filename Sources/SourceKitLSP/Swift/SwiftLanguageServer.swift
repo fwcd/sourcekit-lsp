@@ -813,7 +813,7 @@ extension SwiftLanguageServer {
         return
       }
 
-      let tokens = snapshot.tokens.mergedAndSorted.filter { $0.range.overlaps(range) }
+      let tokens = snapshot.tokens.mergedAndSorted.filter { $0.sameLineRange.overlaps(range) }
       let encodedTokens = tokens.lspEncoded
 
       req.reply(DocumentSemanticTokensResponse(data: encodedTokens))

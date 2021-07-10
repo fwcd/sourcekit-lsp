@@ -15,19 +15,20 @@ import LanguageServerProtocol
 import LSPLogging
 
 /// A ranged token in the document used for syntax highlighting.
-/// Note that tokens are always on a single line, i.e. multi-line
-/// tokens are not allowed.
 public struct SyntaxHighlightingToken: Hashable {
   public var start: Position
   public var length: Int
   public var kind: Kind
   public var modifiers: Modifiers
 
-  public var end: Position {
+  /// The end of a token. Note that this requires the token to be
+  /// on a single line, which is the case for all tokens emitted
+  /// by parseTokens, however.
+  public var sameLineEnd: Position {
     Position(line: start.line, utf16index: start.utf16index + length)
   }
-  public var range: Range<Position> {
-    start..<end
+  public var sameLineRange: Range<Position> {
+    start..<sameLineEnd
   }
 
   public init(
@@ -41,6 +42,31 @@ public struct SyntaxHighlightingToken: Hashable {
     self.length = length
     self.kind = kind
     self.modifiers = modifiers
+  }
+
+  /// Splits a potentially multi-line token to multiple single-line tokens.
+  public func splitToSingleLineTokens(in snapshot: DocumentSnapshot) -> [Self]? {
+    guard let startIndex = snapshot.index(of: start) else {
+      return nil
+    }
+
+    let endIndex = snapshot.text.index(startIndex, offsetBy: length)
+    let text = snapshot.text[startIndex..<endIndex]
+    let lines = text.split(separator: "\n")
+
+    return lines
+      .enumerated()
+      .map { (i, content) in
+        Self(
+          start: Position(
+            line: start.line + i,
+            utf16index: i == 0 ? start.utf16index : 0
+          ),
+          length: content.count,
+          kind: kind,
+          modifiers: modifiers
+        )
+      }
   }
 
   /// The token type. Represented using an int to make the conversion to
@@ -196,8 +222,8 @@ extension Array where Element == SyntaxHighlightingToken {
   /// preferring the given array's tokens if duplicate ranges are
   /// found.
   public func mergingTokens(with other: [SyntaxHighlightingToken]) -> [SyntaxHighlightingToken] {
-    let otherRanges = Set(other.map(\.range))
-    return filter { !otherRanges.contains($0.range) } + other
+    let otherRanges = Set(other.map(\.sameLineRange))
+    return filter { !otherRanges.contains($0.sameLineRange) } + other
   }
 }
 
@@ -219,14 +245,14 @@ struct SyntaxHighlightingTokenParser {
        let length: Int = useName ? response[keys.namelength] : response[keys.length],
        let start: Position = snapshot.positionOf(utf8Offset: offset),
        let skKind: sourcekitd_uid_t = response[keys.kind],
-       let (kind, modifiers) = parseKindAndModifiers(skKind) {
-      let token = SyntaxHighlightingToken(
-        start: start,
-        length: length,
-        kind: kind,
-        modifiers: modifiers
-      )
-      tokens.append(token)
+       let (kind, modifiers) = parseKindAndModifiers(skKind),
+       let newTokens = SyntaxHighlightingToken(
+         start: start,
+         length: length,
+         kind: kind,
+         modifiers: modifiers
+       ).splitToSingleLineTokens(in: snapshot) {
+      tokens += newTokens
     }
 
     if let substructure: SKDResponseArray = response[keys.substructure] {

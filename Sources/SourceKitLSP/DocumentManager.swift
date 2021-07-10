@@ -184,9 +184,9 @@ public final class DocumentManager {
                 // Only keep tokens that don't overlap with or are directly
                 // adjacent to the edit range and also are adjacent to a
                 // token-bounding character.
-                $0.start > range.upperBound || range.lowerBound > $0.end
+                $0.start > range.upperBound || range.lowerBound > $0.sameLineEnd
                 || ($0.start == range.upperBound && (edit.text.first.map(isTokenBounding(character:)) ?? true))
-                || ($0.end == range.lowerBound && (edit.text.last.map(isTokenBounding(character:)) ?? true))
+                || ($0.sameLineEnd == range.lowerBound && (edit.text.last.map(isTokenBounding(character:)) ?? true))
               }
               .map {
                 // Shift tokens after the edit range
@@ -274,7 +274,7 @@ public final class DocumentManager {
 
         func removeAllOverlapping(tokens existingTokens: inout [SyntaxHighlightingToken]) {
           existingTokens.removeAll { existing in
-            newTokens.contains { existing.range.overlaps($0.range) }
+            newTokens.contains { existing.sameLineRange.overlaps($0.sameLineRange) }
           }
         }
 

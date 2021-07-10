@@ -162,6 +162,24 @@ final class SemanticTokensTests: XCTestCase {
     ])
   }
 
+  func testSyntacticTokensForMultiLineComments() {
+    let text = """
+    let x = 3 /*
+    let x = 12
+    */
+    """
+    let tokens = performSemanticTokensRequest(text: text)
+    XCTAssertEqual(tokens, [
+      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 3, kind: .keyword),
+      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
+      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 8), length: 1, kind: .number),
+      // Multi-line comments are split into single-line tokens
+      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 10), length: 2, kind: .comment),
+      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 0), length: 10, kind: .comment),
+      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 0), length: 2, kind: .comment),
+    ])
+  }
+
   func testSemanticTokens() {
     let text = """
     struct X {}
