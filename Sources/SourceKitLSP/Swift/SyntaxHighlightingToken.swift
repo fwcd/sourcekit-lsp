@@ -242,17 +242,30 @@ struct SyntaxHighlightingTokenParser {
     var tokens: [SyntaxHighlightingToken] = []
 
     if let offset: Int = useName ? response[keys.nameoffset] : response[keys.offset],
-       let length: Int = useName ? response[keys.namelength] : response[keys.length],
+       var length: Int = useName ? response[keys.namelength] : response[keys.length],
        let start: Position = snapshot.positionOf(utf8Offset: offset),
        let skKind: sourcekitd_uid_t = response[keys.kind],
-       let (kind, modifiers) = parseKindAndModifiers(skKind),
-       let newTokens = SyntaxHighlightingToken(
-         start: start,
-         length: length,
-         kind: kind,
-         modifiers: modifiers
-       ).splitToSingleLineTokens(in: snapshot) {
-      tokens += newTokens
+       let (kind, modifiers) = parseKindAndModifiers(skKind) {
+
+      // We treat function declaration name tokens as a special case, e.g.
+      // SourceKit returns `f(x: Int, y: Int)` as a name instead of just `f`.
+      if useName && [.function, .method].contains(kind) && modifiers.contains(.declaration),
+         let name: String = response[keys.name],
+         name.contains("("),
+         let funcNameLength: Int = name.split(separator: "(").first?.count {
+        length = funcNameLength
+      }
+
+      let multiLineToken = SyntaxHighlightingToken(
+        start: start,
+        length: length,
+        kind: kind,
+        modifiers: modifiers
+      )
+
+      if let newTokens = multiLineToken.splitToSingleLineTokens(in: snapshot) {
+        tokens += newTokens
+      }
     }
 
     if let substructure: SKDResponseArray = response[keys.substructure] {
@@ -336,6 +349,12 @@ struct SyntaxHighlightingTokenParser {
          values.decl_var_class,
          values.decl_var_instance:
       return (.property, [.declaration])
+    case values.decl_var_parameter:
+      // SourceKit seems to use these to refer to parameter labels,
+      // therefore we don't use .parameter here (which LSP clients like
+      // VSCode seem to interpret as variable identifiers, however
+      // causing a 'wrong highlighting' e.g. of `x` in `f(x y: Int) {}`)
+      return (.function, [.declaration])
     case values.ref_var_static,
          values.ref_var_class,
          values.ref_var_instance:
@@ -343,11 +362,6 @@ struct SyntaxHighlightingTokenParser {
     case values.decl_var_local,
          values.decl_var_global:
       return (.variable, [.declaration])
-    // We ignore `value.decl_var_parameter`s for now.
-    // SourceKit seems to use these to refer to parameter labels,
-    // therefore we don't use .parameter here (which LSP client like
-    // VSCode seem to interpret as variable identifiers, however
-    // causing a 'wrong highlighting' e.g. of `x` in `f(x y: Int) {}`)
     case values.ref_var_local,
          values.ref_var_global:
       return (.variable, [])
@@ -361,8 +375,13 @@ struct SyntaxHighlightingTokenParser {
     case values.syntaxtype_string:
       return (.string, [])
     default:
-      let name = api.uid_get_string_ptr(uid).map(String.init(cString:))
-      log("Unknown token kind: \(name ?? "?")", level: .warning)
+      let ignoredKinds: Set<sourcekitd_uid_t> = [
+        values.syntaxtype_identifier
+      ]
+      if !ignoredKinds.contains(uid) {
+        let name = api.uid_get_string_ptr(uid).map(String.init(cString:))
+        log("Unknown token kind: \(name ?? "?")", level: .warning)
+      }
       return nil
     }
   }

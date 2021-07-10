@@ -221,7 +221,7 @@ final class SemanticTokensTests: XCTestCase {
       SyntaxHighlightingToken(start: Position(line: 3, utf16index: 12), length: 1, kind: .variable),
       // func a() {}
       SyntaxHighlightingToken(start: Position(line: 5, utf16index: 0), length: 4, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 5), length: 3, kind: .function, modifiers: .declaration),
+      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 5), length: 1, kind: .function, modifiers: .declaration),
       // let b = {}
       SyntaxHighlightingToken(start: Position(line: 6, utf16index: 0), length: 3, kind: .keyword),
       SyntaxHighlightingToken(start: Position(line: 6, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
@@ -257,20 +257,20 @@ final class SemanticTokensTests: XCTestCase {
       SyntaxHighlightingToken(start: Position(line: 3, utf16index: 11), length: 1, kind: .interface),
       // func f<T: X>() {}
       SyntaxHighlightingToken(start: Position(line: 5, utf16index: 0), length: 4, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 5), length: 9, kind: .function, modifiers: .declaration),
+      SyntaxHighlightingToken(start: Position(line: 5, utf16index: 5), length: 1, kind: .function, modifiers: .declaration),
       SyntaxHighlightingToken(start: Position(line: 5, utf16index: 7), length: 1, kind: .typeParameter, modifiers: .declaration),
       SyntaxHighlightingToken(start: Position(line: 5, utf16index: 10), length: 1, kind: .interface),
     ])
   }
 
   func testSemanticTokensForFunctionSignatures() {
-    // Function declarations generate a big token that spans
-    // the entire function signature.
     let text = "func f(x: Int, _ y: String) {}"
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
       SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 4, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 5), length: 22, kind: .function, modifiers: .declaration),
+      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 5), length: 1, kind: .function, modifiers: .declaration),
+      // Parameter labels use .function as a kind, see parseKindAndModifiers for rationale
+      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 7), length: 1, kind: .function, modifiers: .declaration),
       SyntaxHighlightingToken(start: Position(line: 0, utf16index: 10), length: 3, kind: .struct),
       SyntaxHighlightingToken(start: Position(line: 0, utf16index: 15), length: 1, kind: .keyword),
       SyntaxHighlightingToken(start: Position(line: 0, utf16index: 20), length: 6, kind: .struct),
