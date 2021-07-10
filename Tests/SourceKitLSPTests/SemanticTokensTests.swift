@@ -180,6 +180,18 @@ final class SemanticTokensTests: XCTestCase {
     ])
   }
 
+  func testSyntacticTokensForDocComments() {
+    let text = """
+    /** abc */
+      /// def
+    """
+    let tokens = performSemanticTokensRequest(text: text)
+    XCTAssertEqual(tokens, [
+      SyntaxHighlightingToken(start: Position(line: 0, utf16index: 0), length: 10, kind: .comment),
+      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 2), length: 7, kind: .comment),
+    ])
+  }
+
   func testSemanticTokens() {
     let text = """
     struct X {}
