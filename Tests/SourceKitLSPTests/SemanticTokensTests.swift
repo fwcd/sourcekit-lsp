@@ -54,9 +54,9 @@ final class SemanticTokensTests: XCTestCase {
 
     // We wait for the first refresh request to make sure that the semantic tokens are ready
 
-    let expectation = XCTestExpectation(description: "performSemanticTokensRequest - refresh received")
+    let refreshExpectation = expectation(description: "performSemanticTokensRequest - refresh received")
     sk.handleNextRequest { (req: Request<WorkspaceSemanticTokensRefreshRequest>) in
-      expectation.fulfill()
+      refreshExpectation.fulfill()
       req.reply(VoidResponse())
     }
 
@@ -67,10 +67,7 @@ final class SemanticTokensTests: XCTestCase {
       text: text
     )))
 
-    let waitResult = XCTWaiter.wait(for: [expectation], timeout: 15)
-    if waitResult != .completed {
-      fatalError("error \(waitResult) while waiting for semantic token refresh")
-    }
+    wait(for: [refreshExpectation], timeout: 15)
 
     let textDocument = TextDocumentIdentifier(url)
     let response: DocumentSemanticTokensResponse!
@@ -82,31 +79,6 @@ final class SemanticTokensTests: XCTestCase {
     }
 
     return [SyntaxHighlightingToken](lspEncodedTokens: response.data)
-  }
-
-  func testEmpty() {
-    let text = ""
-    let tokens = performSemanticTokensRequest(text: text)
-    XCTAssertEqual(tokens, [])
-  }
-
-  func testRanged() {
-    let text = """
-    let x = 1
-    let y = 2
-    let z = 3
-    let w = 4
-    """
-    let start = Position(line: 1, utf16index: 0)
-    let end = Position(line: 2, utf16index: 5)
-    let tokens = performSemanticTokensRequest(text: text, range: start..<end)
-    XCTAssertEqual(tokens, [
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
-      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 8), length: 1, kind: .number),
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
-      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
-    ])
   }
 
   func testIntArrayCoding() {
@@ -141,6 +113,31 @@ final class SemanticTokensTests: XCTestCase {
 
     let decoded = [SyntaxHighlightingToken](lspEncodedTokens: encoded)
     XCTAssertEqual(decoded, tokens)
+  }
+
+  func testEmpty() {
+    let text = ""
+    let tokens = performSemanticTokensRequest(text: text)
+    XCTAssertEqual(tokens, [])
+  }
+
+  func testRanged() {
+    let text = """
+    let x = 1
+    let test = 20
+    let abc = 333
+    let y = 4
+    """
+    let start = Position(line: 1, utf16index: 0)
+    let end = Position(line: 2, utf16index: 5)
+    let tokens = performSemanticTokensRequest(text: text, range: start..<end)
+    XCTAssertEqual(tokens, [
+      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
+      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 4), length: 4, kind: .variable, modifiers: .declaration),
+      SyntaxHighlightingToken(start: Position(line: 1, utf16index: 11), length: 2, kind: .number),
+      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 0), length: 3, kind: .keyword),
+      SyntaxHighlightingToken(start: Position(line: 2, utf16index: 4), length: 3, kind: .variable, modifiers: .declaration),
+    ])
   }
 
   func testSyntacticTokens() {
