@@ -285,6 +285,7 @@ public struct sourcekitd_values {
   public let syntaxtype_keyword: sourcekitd_uid_t
   public let syntaxtype_number: sourcekitd_uid_t
   public let syntaxtype_string: sourcekitd_uid_t
+  public let syntaxtype_string_interpolation_anchor: sourcekitd_uid_t
   public let syntaxtype_type_identifier: sourcekitd_uid_t
   public let syntaxtype_identifier: sourcekitd_uid_t
   public let expr_object_literal: sourcekitd_uid_t
@@ -387,6 +388,7 @@ public struct sourcekitd_values {
     syntaxtype_keyword = api.uid_get_from_cstr("source.lang.swift.syntaxtype.keyword")!
     syntaxtype_number = api.uid_get_from_cstr("source.lang.swift.syntaxtype.number")!
     syntaxtype_string = api.uid_get_from_cstr("source.lang.swift.syntaxtype.string")!
+    syntaxtype_string_interpolation_anchor = api.uid_get_from_cstr("source.lang.swift.syntaxtype.string_interpolation_anchor")!
     syntaxtype_type_identifier = api.uid_get_from_cstr("source.lang.swift.syntaxtype.typeidentifier")!
     syntaxtype_identifier = api.uid_get_from_cstr("source.lang.swift.syntaxtype.identifier")!
     expr_object_literal = api.uid_get_from_cstr("source.lang.swift.expr.object_literal")!

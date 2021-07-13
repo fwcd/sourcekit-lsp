@@ -393,11 +393,12 @@ struct SyntaxHighlightingTokenParser {
       return (.string, [])
     default:
       let ignoredKinds: Set<sourcekitd_uid_t> = [
-        values.syntaxtype_identifier
+        values.syntaxtype_identifier,
+        values.syntaxtype_string_interpolation_anchor,
       ]
       if !ignoredKinds.contains(uid) {
         let name = api.uid_get_string_ptr(uid).map(String.init(cString:))
-        log("Unknown token kind: \(name ?? "?")", level: .warning)
+        log("Unknown token kind: \(name ?? "?")", level: .debug)
       }
       return nil
     }
