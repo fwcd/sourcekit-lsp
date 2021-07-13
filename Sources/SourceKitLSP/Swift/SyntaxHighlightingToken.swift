@@ -230,6 +230,11 @@ extension Array where Element == SyntaxHighlightingToken {
 /// Parses tokens from sourcekitd response dictionaries.
 struct SyntaxHighlightingTokenParser {
   private let sourcekitd: SourceKitD
+  /// Use `keys.nameoffset` and `keys.namelength` instead of `keys.offset`
+  /// and `keys.length`. This is useful in AST structures provided by
+  /// sourcekitd, since these contain both a name range and a normal range,
+  /// where the latter refers to the entire node (e.g. the entire function
+  /// declaration).
   private let useName: Bool
 
   init(sourcekitd: SourceKitD, useName: Bool = false) {
