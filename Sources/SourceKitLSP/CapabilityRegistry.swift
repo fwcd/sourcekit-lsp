@@ -142,6 +142,11 @@ public final class CapabilityRegistry {
     }
   }
 
+  /// Checks whether a registration for semantic tokens for the given languages exists.
+  public func hasSemanticTokensRegistration(for languages: [Language]) -> Bool {
+    registration(for: languages, in: semanticTokens) != nil
+  }
+
   private func documentSelector(for langauges: [Language]) -> DocumentSelector {
     return DocumentSelector(langauges.map { DocumentFilter(language: $0.rawValue) })
   }

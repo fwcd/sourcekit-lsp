@@ -104,7 +104,8 @@ public struct SyntaxHighlightingToken: Hashable {
     case `operator`
 
     /// The name of the token type used by LSP.
-    var lspName: String {
+    /// **Public for testing.**
+    public var lspName: String {
       switch self {
       case .namespace: return "namespace"
       case .type: return "type"
@@ -168,6 +169,7 @@ public struct SyntaxHighlightingToken: Hashable {
     /// The name of the modifier used by LSP, if this
     /// is a single modifier. Note that every modifier
     /// in `allCases` must have an associated `lspName`.
+    /// **Public for testing.**
     public var lspName: String? {
       switch self {
       case .declaration: return "declaration"

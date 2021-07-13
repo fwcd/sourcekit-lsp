@@ -44,7 +44,18 @@ final class SemanticTokensTests: XCTestCase {
             refreshSupport: true
           )
         ),
-        textDocument: nil
+        textDocument: .init(
+          semanticTokens: .init(
+            dynamicRegistration: true,
+            requests: .init(
+              range: .bool(true),
+              full: .bool(true)
+            ),
+            tokenTypes: Token.Kind.allCases.map(\.lspName),
+            tokenModifiers: Token.Modifiers.allCases.map { $0.lspName! },
+            formats: [.relative]
+          )
+        )
       ),
       trace: .off,
       workspaceFolders: nil
@@ -54,12 +65,24 @@ final class SemanticTokensTests: XCTestCase {
   private func performSemanticTokensRequest(text: String, range: Range<Position>? = nil) -> [Token] {
     let url = URL(fileURLWithPath: "/\(#function)/a.swift")
 
-    // We wait for the first refresh request to make sure that the semantic tokens are ready
+    // We will wait for the server to dynamically register semantic tokens
+
+    let registerCapabilityExpectation = expectation(description: "performSemanticTokensRequest - register semantic tokens capability")
+    sk.appendOneShotRequestHandler { (req: Request<RegisterCapabilityRequest>) in
+      let registrations = req.params.registrations
+      XCTAssert(registrations.contains { reg in
+        reg.method == SemanticTokensRegistrationOptions.method
+      })
+      req.reply(VoidResponse())
+      registerCapabilityExpectation.fulfill()
+    }
+
+    // We will wait for the first refresh request to make sure that the semantic tokens are ready
 
     let refreshExpectation = expectation(description: "performSemanticTokensRequest - refresh received")
-    sk.handleNextRequest { (req: Request<WorkspaceSemanticTokensRefreshRequest>) in
-      refreshExpectation.fulfill()
+    sk.appendOneShotRequestHandler { (req: Request<WorkspaceSemanticTokensRefreshRequest>) in
       req.reply(VoidResponse())
+      refreshExpectation.fulfill()
     }
 
     sk.send(DidOpenTextDocumentNotification(textDocument: TextDocumentItem(
@@ -69,7 +92,7 @@ final class SemanticTokensTests: XCTestCase {
       text: text
     )))
 
-    wait(for: [refreshExpectation], timeout: 15)
+    wait(for: [registerCapabilityExpectation, refreshExpectation], timeout: 15)
 
     let textDocument = TextDocumentIdentifier(url)
     let response: DocumentSemanticTokensResponse!
