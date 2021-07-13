@@ -312,4 +312,42 @@ final class SemanticTokensTests: XCTestCase {
       Token(start: Position(line: 6, utf16index: 2), length: 1, kind: .method, modifiers: [.static]),
     ])
   }
+
+  func testSemanticTokensForEnumMembers() {
+    let text = """
+    enum Maybe<T> {
+      case none
+      case some(T)
+    }
+
+    let x = Maybe<String>.none
+    let y: Maybe = .some(42)
+    """
+    let tokens = performSemanticTokensRequest(text: text)
+    XCTAssertEqual(tokens, [
+      // enum Maybe<T>
+      Token(start: Position(line: 0, utf16index: 0), length: 4, kind: .keyword),
+      Token(start: Position(line: 0, utf16index: 5), length: 5, kind: .enum, modifiers: .declaration),
+      Token(start: Position(line: 0, utf16index: 11), length: 1, kind: .typeParameter, modifiers: .declaration),
+      // case none
+      Token(start: Position(line: 1, utf16index: 2), length: 4, kind: .keyword),
+      Token(start: Position(line: 1, utf16index: 7), length: 4, kind: .enumMember, modifiers: .declaration),
+      // case some
+      Token(start: Position(line: 2, utf16index: 2), length: 4, kind: .keyword),
+      Token(start: Position(line: 2, utf16index: 7), length: 4, kind: .enumMember, modifiers: .declaration),
+      Token(start: Position(line: 2, utf16index: 12), length: 1, kind: .typeParameter),
+      // let x = Maybe<String>.none
+      Token(start: Position(line: 5, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 5, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 5, utf16index: 8), length: 5, kind: .enum),
+      Token(start: Position(line: 5, utf16index: 14), length: 6, kind: .struct),
+      Token(start: Position(line: 5, utf16index: 22), length: 4, kind: .enumMember),
+      // let y: Maybe = .some(42)
+      Token(start: Position(line: 6, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 6, utf16index: 4), length: 1, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 6, utf16index: 7), length: 5, kind: .enum),
+      Token(start: Position(line: 6, utf16index: 16), length: 4, kind: .enumMember),
+      Token(start: Position(line: 6, utf16index: 21), length: 2, kind: .number),
+    ])
+  }
 }

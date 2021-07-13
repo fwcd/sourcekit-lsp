@@ -163,6 +163,7 @@ extension SemanticTokensTests {
       ("testIntArrayCoding", testIntArrayCoding),
       ("testRanged", testRanged),
       ("testSemanticTokens", testSemanticTokens),
+      ("testSemanticTokensForEnumMembers", testSemanticTokensForEnumMembers),
       ("testSemanticTokensForFunctionSignatures", testSemanticTokensForFunctionSignatures),
       ("testSemanticTokensForProtocols", testSemanticTokensForProtocols),
       ("testSemanticTokensForStaticMethods", testSemanticTokensForStaticMethods),
