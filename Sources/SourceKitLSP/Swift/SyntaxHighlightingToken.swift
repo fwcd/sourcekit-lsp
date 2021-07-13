@@ -372,8 +372,12 @@ struct SyntaxHighlightingTokenParser {
          values.ref_var_global:
       return (.variable, [])
     case values.syntaxtype_comment,
-         values.syntaxtype_doccomment:
+         values.syntaxtype_comment_marker,
+         values.syntaxtype_comment_url:
       return (.comment, [])
+    case values.syntaxtype_doccomment,
+         values.syntaxtype_doccomment_field:
+      return (.comment, [.documentation])
     case values.syntaxtype_type_identifier:
       return (.type, [])
     case values.syntaxtype_number:

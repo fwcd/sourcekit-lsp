@@ -189,8 +189,8 @@ final class SemanticTokensTests: XCTestCase {
     """
     let tokens = performSemanticTokensRequest(text: text)
     XCTAssertEqual(tokens, [
-      Token(start: Position(line: 0, utf16index: 0), length: 10, kind: .comment),
-      Token(start: Position(line: 1, utf16index: 2), length: 7, kind: .comment),
+      Token(start: Position(line: 0, utf16index: 0), length: 10, kind: .comment, modifiers: [.documentation]),
+      Token(start: Position(line: 1, utf16index: 2), length: 7, kind: .comment, modifiers: [.documentation]),
     ])
   }
 
