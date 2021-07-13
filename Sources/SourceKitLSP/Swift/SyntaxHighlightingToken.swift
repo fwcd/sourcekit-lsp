@@ -247,9 +247,9 @@ struct SyntaxHighlightingTokenParser {
        let skKind: sourcekitd_uid_t = response[keys.kind],
        let (kind, modifiers) = parseKindAndModifiers(skKind) {
 
-      // We treat function declaration name tokens as a special case, e.g.
-      // SourceKit returns `f(x: Int, y: Int)` as a name instead of just `f`.
-      if useName && [.function, .method].contains(kind) && modifiers.contains(.declaration),
+      // We treat function declaration and enum member name tokens as a special
+      // case, e.g. SourceKit returns `f(x: Int, y: Int)` as a name instead of just `f`.
+      if useName && [.function, .method, .enumMember].contains(kind) && modifiers.contains(.declaration),
          let name: String = response[keys.name],
          name.contains("("),
          let funcNameLength: Int = name.split(separator: "(").first?.count {
@@ -307,6 +307,10 @@ struct SyntaxHighlightingTokenParser {
       return (.enum, [.declaration])
     case values.ref_enum:
       return (.enum, [])
+    case values.decl_enumelement:
+      return (.enumMember, [.declaration])
+    case values.ref_enumelement:
+      return (.enumMember, [])
     case values.decl_protocol:
       return (.interface, [.declaration])
     case values.ref_protocol:
