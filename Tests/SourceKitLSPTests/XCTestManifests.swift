@@ -168,6 +168,7 @@ extension SemanticTokensTests {
       ("testSemanticTokensForProtocols", testSemanticTokensForProtocols),
       ("testSemanticTokensForStaticMethods", testSemanticTokensForStaticMethods),
       ("testSyntacticTokens", testSyntacticTokens),
+      ("testSyntacticTokensForBackticks", testSyntacticTokensForBackticks),
       ("testSyntacticTokensForDocComments", testSyntacticTokensForDocComments),
       ("testSyntacticTokensForMultiLineComments", testSyntacticTokensForMultiLineComments),
     ]

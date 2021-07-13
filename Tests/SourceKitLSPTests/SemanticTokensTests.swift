@@ -194,6 +194,24 @@ final class SemanticTokensTests: XCTestCase {
     ])
   }
 
+  func testSyntacticTokensForBackticks() {
+    let text = """
+    var `if` = 20
+    let `else` = 3
+    """
+    let tokens = performSemanticTokensRequest(text: text)
+    XCTAssertEqual(tokens, [
+      // var `if` = 20
+      Token(start: Position(line: 0, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 0, utf16index: 4), length: 4, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 0, utf16index: 11), length: 2, kind: .number),
+      // let `else` = 3
+      Token(start: Position(line: 1, utf16index: 0), length: 3, kind: .keyword),
+      Token(start: Position(line: 1, utf16index: 4), length: 6, kind: .variable, modifiers: .declaration),
+      Token(start: Position(line: 1, utf16index: 13), length: 1, kind: .number)
+    ])
+  }
+
   func testSemanticTokens() {
     let text = """
     struct X {}

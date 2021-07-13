@@ -256,6 +256,13 @@ struct SyntaxHighlightingTokenParser {
         length = funcNameLength
       }
 
+      // If the name is escaped in backticks, we need to add two characters to the
+      // length for the backticks.
+      if modifiers.contains(.declaration),
+         let index = snapshot.indexOf(utf8Offset: offset), snapshot.text[index] == "`" {
+        length += 2
+      }
+
       let multiLineToken = SyntaxHighlightingToken(
         start: start,
         length: length,
